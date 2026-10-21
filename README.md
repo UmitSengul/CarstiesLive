@@ -42,7 +42,7 @@ You can see how this app was made by taking the [Udemy course](https://www.udemy
     mkcert -install
     ```
 
-7. Generate a certificate and key to replace the ones used in the course. Change into the `devcerts` directory and run:
+7. Generate a certificate and key to replace the ones used in the course. Create a new folder in the local-deploy folder called `devcerts` and then change into the `devcerts` directory and run:
 
     ```
     cd devcerts
