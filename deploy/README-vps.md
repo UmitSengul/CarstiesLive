@@ -36,11 +36,16 @@ Issuer: `https://umitsengul.online/carsties/id` · Client redirect URI:
 
 ## 3) Deploy (GitHub Actions)
 
-Akış: `main`'e push → **quality** (build + NuGet/npm audit + lint + next build) →
-**build-and-push** (7 imaj, GHCR) → **deploy** (SSH → `deploy/deploy.sh`).
+Akış: `path-migration` (ve `main`) dalına push → **quality** (build + NuGet/npm audit + lint +
+next build + basePath doğrulaması) → **build-and-push** (7 imaj, GHCR) → **deploy**
+(SSH → `deploy/deploy.sh`, `DEPLOY_BRANCH=<push edilen dal>`).
+
+> Not: Bu repoda `main` dalı **başka bir hatta** (kurs spec'leri / CourseAssets); Carsties
+> kodu `path-migration` dalında yaşıyor. Bu yüzden workflow iki dalı da tetikler ve VPS'teki
+> klonu push edilen dala eşitler.
 
 `deploy/deploy.sh` ne yapar:
-1. `git fetch` + `git reset --hard origin/main` (`deploy/.env` izlenmediği için korunur)
+1. `git fetch` + `git reset --hard origin/<DEPLOY_BRANCH>` (`deploy/.env` izlenmediği için korunur)
 2. `IMAGE_TAG=sha-<kısa commit>` (imaj etiketi)
 3. `docker compose pull` + `up -d --remove-orphans` (build yok)
 4. `docker exec nginx-proxy nginx -t && nginx -s reload`
@@ -51,7 +56,7 @@ Gerekli GitHub **secrets**: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_USER`, 
 
 Elle deploy:
 ```bash
-ssh vps 'cd /opt/carsties && ./deploy/deploy.sh'
+ssh vps 'cd /opt/carsties && DEPLOY_BRANCH=path-migration ./deploy/deploy.sh'
 # belirli sürüme sabitlemek / geri almak icin:
 ssh vps 'cd /opt/carsties && IMAGE_TAG=sha-<eski-sha> ./deploy/deploy.sh'
 ```

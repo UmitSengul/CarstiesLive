@@ -6,7 +6,8 @@
 #   ./deploy/deploy.sh
 #
 # Yaptigi isler:
-#   1) depoyu origin/main ile esitler (deploy/.env izlenmeyen dosya olarak kalir)
+#   1) depoyu origin/<DEPLOY_BRANCH> ile esitler (varsayilan: main;
+#      Carsties kodu simdilik path-migration dalinda) - deploy/.env izlenmez, korunur
 #   2) GHCR'ye login (GHCR_USER/GHCR_PAT verilirse)
 #   3) imajlari ceker (IMAGE_TAG yoksa sha-<kisa commit>)
 #   4) servisleri gunceller (build YOK)

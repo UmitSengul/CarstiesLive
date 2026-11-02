@@ -2,9 +2,11 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]
+    # `main` BASKA bir hatta (kurs spec'leri); Carsties kodu `path-migration`
+    # dalinda yasiyor. Ikisi de tetikler, deploy edilen dal commit'in dalidir.
+    branches: [main, path-migration]
   pull_request:
-    branches: [main]
+    branches: [main, path-migration]
   workflow_dispatch:
 
 env:
@@ -67,11 +69,20 @@ jobs:
         working-directory: frontend/web-app
         run: npm run lint
 
-      - name: next build
+      # Prod konfigurasyonuyla derle (basePath ve URL'ler imaja gomulen degerlerle ayni)
+      - name: next build (prod basePath ile)
         working-directory: frontend/web-app
         env:
           BETTER_AUTH_SECRET: ci-build-only-secret-not-used-at-runtime
+          BETTER_AUTH_URL: https://${{ env.PUBLIC_DOMAIN }}
+          NEXT_PUBLIC_BASE_API: https://${{ env.PUBLIC_DOMAIN }}${{ env.PUBLIC_BASE_PATH }}/api
+          NEXT_PUBLIC_ID_URL: https://${{ env.PUBLIC_DOMAIN }}${{ env.PUBLIC_BASE_PATH }}/id
+          NEXT_PUBLIC_BASE_PATH: ${{ env.PUBLIC_BASE_PATH }}
         run: npm run build
+
+      - name: basePath dogrulama
+        working-directory: frontend/web-app
+        run: jq -e '.basePath == "/carsties"' .next/routes-manifest.json
 
   build-and-push:
     name: Build & push ${{ matrix.name }}
@@ -144,8 +155,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
   deploy:
-    name: Deploy to VPS
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    name: Deploy to VPS (${{ github.ref_name }})
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/path-migration')
     needs: [build-and-push]
     runs-on: ubuntu-latest
     steps:
@@ -159,4 +170,5 @@ jobs:
           script: |
             set -euo pipefail
             cd /opt/carsties
-            GHCR_USER='${{ secrets.GHCR_USER }}' GHCR_PAT='${{ secrets.GHCR_PAT }}' ./deploy/deploy.sh
+            # DEPLOY_BRANCH: VPS'teki klonun hangi dala esitlenecegini belirler
+            DEPLOY_BRANCH='${{ github.ref_name }}' GHCR_USER='${{ secrets.GHCR_USER }}' GHCR_PAT='${{ secrets.GHCR_PAT }}' ./deploy/deploy.sh

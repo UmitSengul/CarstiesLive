@@ -61,9 +61,15 @@ Test hesapları: `alice` / `Pass123$` · `bob` / `Pass123$`.
 İmajlar GitHub Actions ile build edilip **GHCR**'ye (`ghcr.io/umitsengul/carstieslive-*`) push edilir,
 VPS yalnızca `docker compose pull && up -d` yapar (sunucuda build yok).
 
+Carsties kodu **`path-migration`** dalında yaşar (`main` bu repoda başka bir hatta — kurs
+spec'leri). CI/CD iki dalı da dinler ve VPS'teki klonu push edilen dala eşitler.
+
 ```bash
 # VPS'te elle deploy / güncelleme
-cd /opt/carsties && ./deploy/deploy.sh
+cd /opt/carsties && DEPLOY_BRANCH=path-migration ./deploy/deploy.sh
+
+# geri alma (imaj etiketi ile)
+cd /opt/carsties && IMAGE_TAG=sha-<eski-sha> ./deploy/deploy.sh
 ```
 
 Ayrıntılar: [`deploy/README-vps.md`](deploy/README-vps.md)
