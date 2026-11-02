@@ -52,6 +52,9 @@ ARG NEXT_PUBLIC_BASE_API=https://umitsengul.online/carsties/api
 ARG NEXT_PUBLIC_ID_URL=https://umitsengul.online/carsties/id
 ARG BETTER_AUTH_URL=https://umitsengul.online
 ARG NEXT_PUBLIC_BASE_PATH=/carsties
+# Next build sirasinda better-auth "default secret" hatasi vermesin diye
+# gecici bir deger; GERCEK secret runtime'da compose env ile verilir.
+ARG BETTER_AUTH_SECRET=build-time-placeholder-not-used-at-runtime
 
 ENV NEXT_PUBLIC_BASE_API=$NEXT_PUBLIC_BASE_API \
     NEXT_PUBLIC_ID_URL=$NEXT_PUBLIC_ID_URL \
@@ -70,7 +73,7 @@ ENV NEXT_PUBLIC_BASE_API=$NEXT_PUBLIC_BASE_API \
 # .next/cache/fetch-cache from being included in the final image, meaning
 # cached fetch responses from the build won't be available at runtime.
 RUN if [ -f package-lock.json ]; then \
-    npm run build; \
+    BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET}" npm run build; \
   elif [ -f yarn.lock ]; then \
     corepack enable yarn && yarn build; \
   elif [ -f pnpm-lock.yaml ]; then \

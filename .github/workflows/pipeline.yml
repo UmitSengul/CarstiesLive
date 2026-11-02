@@ -113,7 +113,9 @@ jobs:
             dockerfile: src/GatewayService/Dockerfile
           - name: web-app
             context: frontend/web-app
-            dockerfile: Dockerfile
+            # NOT: build-push-action `file` yolunu workspace kokune gore cozer
+            # (context'e gore degil) -> "Dockerfile" yazmak build'i kirar.
+            dockerfile: frontend/web-app/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
@@ -155,7 +157,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
   deploy:
-    name: Deploy to VPS (${{ github.ref_name }})
+    name: Deploy to VPS
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/path-migration')
     needs: [build-and-push]
     runs-on: ubuntu-latest
