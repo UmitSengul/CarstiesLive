@@ -74,6 +74,11 @@ cd /opt/carsties && IMAGE_TAG=sha-<eski-sha> ./deploy/deploy.sh
 
 Ayrıntılar: [`deploy/README-vps.md`](deploy/README-vps.md)
 
+## Yol haritası
+
+Neler tamamlandı, neler sırada? (responsive tasarım, koyu/açık tema seçici, test altyapısı,
+izleme/yedekleme, güvenlik sertleştirmeleri…): [`ROADMAP.md`](ROADMAP.md)
+
 ## Dizinler
 
 ```
@@ -81,4 +86,5 @@ src/                 .NET servisleri (Identity, Gateway, Auction, Bid, Search, N
 frontend/web-app/    Next.js uygulaması
 deploy/              prod compose override, edge nginx, landing, certs.sh, deploy.sh, .env.example
 specs/               servis bazlı teknik dokümanlar
+ROADMAP.md           yapılanlar + yapılacaklar (önceliklendirilmiş backlog)
 ```

@@ -1,0 +1,240 @@
+# Carsties — Yapılanlar ve Yol Haritası
+
+> Son güncelleme: **02.11.2026** · Canlı: <https://umitsengul.online/carsties/> · Kök: <https://umitsengul.online/>
+> Operasyon notları: [`deploy/README-vps.md`](deploy/README-vps.md) · Kurulum: [`README.md`](README.md)
+
+Bu dosya iki bölümden oluşur: **yapılanlar** (tamamlanmış işler, doğrulama notlarıyla) ve
+**yapılacaklar** (önceliklendirilmiş backlog). Bir madde tamamlandığında `[x]` yapıp altına
+tarih + kısa not düşün.
+
+---
+
+## 1. Canlı sistemin bugünkü durumu
+
+| Bileşen | Durum |
+|---|---|
+| Yayın adresi | `https://umitsengul.online` (tek alan adı, path tabanlı) |
+| Uygulama | `https://umitsengul.online/carsties` — Next.js 16.4.4, `basePath=/carsties` |
+| Gateway | `https://umitsengul.online/carsties/api` — YARP (önek silinir) |
+| Identity | `https://umitsengul.online/carsties/id` — Duende IdentityServer, `PathBase=/carsties/id` |
+| Issuer | `https://umitsengul.online/carsties/id` |
+| better-auth callback | `https://umitsengul.online/carsties/api/auth/callback/duende` |
+| TLS | Let's Encrypt (HTTP-01 / webroot), geçerlilik **31.01.2027** · otomatik yenileme: `carsties-certs.timer` |
+| Edge | `nginx:1.29-alpine` (statik config, `deploy/nginx/conf.d/`) — HSTS + WebSocket upgrade |
+| İmajlar | `ghcr.io/umitsengul/carstieslive-*:{latest,sha-<commit>}` (public) |
+| CI/CD | GitHub Actions: quality → 7 imaj build/push → SSH deploy (`path-migration`) |
+| Sunucu | AlmaLinux 9.8 · 2 vCPU / 3.5 GiB RAM + 4 GiB swap · `/opt/carsties` (git klonu) |
+
+---
+
+## 2. Yapılanlar
+
+### 2.1 Tek alan adı + path tabanlı yayına geçiş (02.11.2026)
+
+Eski yapı `app.` / `api.` / `id.umitsengul.online` alt alan adlarıydı; tek alan adı + path modeline taşındı.
+
+- [x] **Edge nginx** yazıldı (`deploy/nginx/conf.d/default.conf`): landing `/`, `/carsties/`, `/carsties/api/auth/` (web-app), `/carsties/api/` (gateway, önek silinir), `/carsties/id/` (identity, önek korunur), WebSocket upgrade + HSTS + güvenlik başlıkları.
+- [x] **Landing page** eklendi (`deploy/landing/index.html`) — self-contained, açık/koyu tema uyumlu, Carsties CTA'lı.
+- [x] **Next.js `basePath`** desteği (`next.config.ts`, `Dockerfile` build arg `NEXT_PUBLIC_BASE_PATH`).
+- [x] **Identity `UsePathBase`** (`src/IdentityService/HostingExtensions.cs`, `PathBase` config) + `IssuerUri` path'li hale getirildi; discovery/cookie/redirect'ler önekli üretiliyor.
+- [x] **Gateway/auction/bid** bağlantıları: `ClientApp=https://umitsengul.online` (CORS origin'de path olamaz), `IdentityServiceUrl=http://identity-svc/carsties/id`.
+- [x] `deploy/docker-compose.prod.yml` yeniden yazıldı: statik edge, `pull_policy: always`, iç portlar kapatıldı, `restart: unless-stopped`, log rotasyonu.
+- [x] `deploy/certs.sh` tek domain'e uyarlandı + **`bootstrap`** komutu (edge sertifikasız açılamaz ↔ certbot edge'e ihtiyaç duyar) ve `nginx -s reload`.
+- [x] Doğrulandı: landing **200**, `/carsties` **200**, `/carsties/api/auctions` **200**, `/carsties/id/` **200**, discovery'de tüm endpoint'ler `https://umitsengul.online/carsties/id/...`.
+
+### 2.2 better-auth 1.6.26 → 1.7.15 migrasyonu (kırıcı değişiklikler)
+
+- [x] `genericOAuthClient` client plugin'i **kaldırıldı** (1.7'de yok) → akış `authClient.signIn.social({ provider: "duende" })`.
+- [x] `genericOAuth` config'inden `issuer` alanı çıkarıldı (1.7'de yok); endpoint'ler açıkça verildi.
+- [x] `getAccessToken({ providerId })` → `listUserAccounts()` + `getAccessToken({ accountId })` (`src/lib/fetch-wrapper.ts`).
+- [x] Callback yolu 1.7 varsayılanına alındı: `/api/auth/callback/duende` (`src/IdentityService/Config.cs` redirect URI).
+- [x] `basePath` hem sunucu (`auth.ts`) hem client (`auth-client.ts`) tarafında `/carsties/api/auth` olarak ayarlandı.
+- [x] **Next.js `basePath`'i `req.url`'den siliyor** → `src/app/api/auth/[...all]/route.ts` içinde istek yolu yeniden öneklendi (aksi halde auth uçları 404).
+- [x] Doğrulandı: `/carsties/api/auth/ok` → `{"ok":true}`, sign-in/social → geçerli PKCE'li authorize URL'i, authorize → `303 → /carsties/id/Account/Login`, ROPC token → gateway'de **200**, token'sız **401**.
+
+### 2.3 Bağımlılık güvenliği
+
+| Değişiklik | Gerekçe / sonuç |
+|---|---|
+| `next` 16.3.0 → **16.4.4** | Image Optimization RCE/SSRF (5 CRITICAL) — `next/image` kullanıldığı için gerçek risk |
+| `sharp` → **0.35.5** (override) | RCE zincirinin kökü |
+| `better-auth` 1.6.26 → **1.7.15** | magic-link/OAuth state + oauthProxy açıkları |
+| `shadcn` → **devDependencies** | express/body-parser/qs/undici/systeminformation runtime'a girmesin |
+| `overrides`: `source-map-js`, `nanoid`, `postcss-selector-parser`, `js-yaml`, `fast-uri` | dev zinciri temizliği |
+| `Microsoft.EntityFrameworkCore.Tools` 10.0.1 → **10.0.14** | Pkcs 9.0.0 transitif açığı |
+| `meilisearch` → **v1.56.0**, edge → **nginx:1.29-alpine** | çalışan sürümlere sabitleme |
+
+- [x] Doğrulandı: `npm audit --omit=dev` → **0 vulnerabilities**; `dotnet package list --vulnerable --include-transitive` → **temiz**.
+- [x] CI'da kapılar: `npm audit --omit=dev --audit-level=high` ve NuGet vulnerability gate (JSON + `jq`).
+
+### 2.4 CI/CD — GHCR + GitHub Actions
+
+- [x] `.github/workflows/pipeline.yml`: **quality** (dotnet restore/build, NuGet gate, npm ci, npm audit, lint, `next build` prod `basePath` ile, `jq` ile basePath doğrulaması) → **build-and-push** (7 imaj, matrix, `latest` + `sha-<7>` etiketleri, gha cache) → **deploy** (SSH → `deploy/deploy.sh`, `DEPLOY_BRANCH=<push edilen dal>`).
+- [x] `.github/dependabot.yml`: npm / nuget / docker / github-actions (haftalık, minor+patch gruplu).
+- [x] `deploy/deploy.sh`: `git fetch` + `reset --hard` → imaj çek (build yok) → `up -d` → edge `nginx -t` + reload → smoke test (uyarı bazlı, `SMOKE_STRICT=1` katı) → `IMAGE_TAG` ile rollback desteği.
+- [x] `main` dalının farklı bir hatta (kurs spec'leri) olduğu tespit edildi → Carsties kodu **`path-migration`** dalında; workflow iki dalı da dinliyor, deploy edilen dal commit'in dalı.
+- [x] VPS'te `/opt/carsties` rsync kopyasından **git klonuna** çevrildi (deploy key + `deploy/.env` korunarak; yedek: `/opt/carsties.rsync-bak-20261102-2302`).
+- [x] Doğrulandı: `web-app:sha-f4ee239` GHCR'de mevcut (web-app build'i düzeltildikten sonra).
+
+### 2.5 VPS operasyonu & TLS
+
+- [x] `deploy/.env` yeni şemaya geçirildi (`DOMAIN`, `IMAGE_TAG`; eski `APP_HOST/API_HOST/ID_HOST` kaldırıldı), izin `600`.
+- [x] Let's Encrypt sertifikası alındı (`carsties-prod` lineage) ve edge'e yazıldı; HTTP → HTTPS **301**, HSTS aktif.
+- [x] DNS: `umitsengul.online` A kaydı `185.93.70.199` (yayılım Cloudflare/Google DoH ile doğrulandı).
+- [x] Firewall doğrulandı: `http https ssh` + `51820/udp` (WireGuard).
+
+### 2.6 Yayın sırasında bulunup düzeltilen hatalar
+
+| # | Belirti | Kök neden | Çözüm |
+|---|---|---|---|
+| 1 | web-app CI build fail | `build-push-action` `file` yolunu **workspace köküne** göre çözüyor | `dockerfile: frontend/web-app/Dockerfile` |
+| 2 | `deploy.sh` "unknown revision origin/main" | Varsayılan dal `main`; VPS'te o dal yok | Varsayılan `path-migration` (CI `DEPLOY_BRANCH` geçiyor) |
+| 3 | Landing `/` → **404** | `location = /` içinde `index` internal redirect yapıyor, `location /` (404) yakalıyor | `try_files /index.html =404` |
+| 4 | `/carsties` ↔ `/carsties/` yönlendirme döngüsü | nginx 301 + Next 308 | nginx 301 kaldırıldı, istek Next'e gidiyor |
+| 5 | Config değişikliği edge'e yansımıyor | Tek dosya bind mount; `git reset` yeni inode → container eski dosyayı görüyor | `deploy/nginx/conf.d/` **dizin mount** |
+| 6 | Discovery iç adres üretiyor (`http://carsties_identity/...`) | nginx'te `proxy_set_header` mirası "hepsi ya da hiçbiri": location'da `Upgrade` tanımlıysa server seviyesindeki `Host`/`X-Forwarded-*` miras alınmıyor | `includes/proxy-headers.conf` her proxy location'da include |
+| 7 | better-auth uçları 404 | Next.js `req.url`'den `basePath`'i siliyor, better-auth tam yol bekliyor | `[...all]/route.ts` içinde önek yeniden eklendi |
+
+---
+
+## 3. Yapılacaklar
+
+Öncelik: **P1** = kullanıcıyı/operasyonu doğrudan etkiler · **P2** = kalite/teknik borç · **P3** = iyileştirme.
+Efor: S (≤ yarım gün) · M (1–2 gün) · L (3+ gün).
+
+### 3.1 Frontend — UX / UI (P1)
+
+- [ ] **Responsive tasarım** — liste grid'i, listing detayı, form ve navigasyon mobil/tablet kırılımları. Şu an 49 `.tsx` dosyasının yalnız **8**'inde breakpoint var. · `M`
+  - `src/app/page.tsx`, `src/features/listings/**`, `src/components/nav/**`
+  - Grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`; `container` yerine `mx-auto w-full max-w-7xl px-4`
+  - Dokunma hedefleri ≥ 44px, yatay taşma testi (`overflow-x`), 360px genişlikte duman testi
+- [ ] **Koyu/açık tema seçici** — header'a `Sun/Moon` toggle. CSS altyapısı **hazır**: `src/app/globals.css` içinde `@custom-variant dark (&:is(.dark *))`, `:root` ve `.dark` değişken setleri mevcut; eksik olan `.dark` sınıfını yöneten katman. · `S`
+  - `npm i next-themes` → `ThemeProvider` (`attribute="class"`, `defaultTheme="system"`, `enableSystem`, `disableTransitionOnChange`)
+  - `src/app/layout.tsx`: `<html lang="tr" suppressHydrationWarning>` + provider sarmalama
+  - `src/components/theme-toggle.tsx`: `useTheme()` + `Sun`/`Moon` (lucide-react), mounted kontrolü ile hydration uyuşmazlığını önle
+  - **Flash (FOUC) önleme**: `next-themes` inline script'i kullan; alternatif olarak `theme` cookie'si + `cookies()` ile SSR'da `className={theme}` (cookie kalıcılığı istenirse)
+  - `prefers-color-scheme` takibi (sistem teması) varsayılan olsun; kullanıcı seçimi sistemin önüne geçsin
+- [ ] **Mobil navigasyon** — hamburger + sheet/drawer; `NavBar`'daki linkler mobilde gizli kalıyor. · `S`
+- [ ] **Yükleniyor / boş durumlar** — `loading.tsx`, iskelet kartlar, boş liste durumu, hata durumunda `error.tsx` (şu an sadece global `error.tsx` var). · `S/M`
+- [ ] **Erişilebilirlik (a11y)** — odak halkaları, `aria-label`'lar, `alt` metinleri, renk kontrastı (koyu temada ayrıca test), klavye ile tam akış, `prefers-reduced-motion`. · `M`
+- [ ] **Dil / i18n** — `<html lang="en">` → `tr`; arayüz metinlerini TR/EN sözlüğe taşı (`next-intl` veya basit `dictionaries`). · `M`
+- [ ] **Görsel optimizasyon** — `next/image` için `sizes`/`priority`, `placeholder="blur"`, `remotePatterns` daraltma (şu an `cdn.pixabay.com`, `loremflickr.com`). · `S`
+- [ ] **Form UX** — alan bazlı hata gösterimi (react-hook-form + zod), submit sırasında disabled state, iyimser (optimistic) bid güncellemesi. · `M`
+- [ ] **Bildirim tercihleri** — SignalR toast'ları için sessize alma / kapatma; bildirim geçmişi. · `M`
+
+### 3.2 Frontend — Teknik kalite (P2)
+
+- [ ] **Test altyapısı** — `vitest` + `@testing-library/react` (bileşen/unit), `@playwright/test` (E2E: login → listing → bid → realtime toast). CI'a `npm test` + headless E2E adımı. · `M`
+- [ ] **API mock** — `msw` ile `fetchWrapper` çağrılarını izole et (test/Storybook). · `S`
+- [ ] **CSP + güvenlik başlıkları** — `next.config.ts` `headers()` ile `Content-Security-Policy` (önce **Report-Only**), `X-Frame-Options`, `Permissions-Policy`. `basePath` nedeniyle nonce/hash stratejisini test et. · `M`
+- [ ] **Hata izleme** — Sentry (client+server), `error.tsx` içinden `captureException`, source map yükleme. · `M`
+- [ ] **Performans** — `@next/bundle-analyzer`, ağır bileşenlerde `dynamic()`, `web-vitals` raporu (LCP/CLS). · `M`
+- [ ] **Lint borcu** — `npm run lint` şu an **0 error / 19 warning** (kullanılmayan import'lar: `BidPanel.tsx`, `CreditCardIcon`, `app-confirm-dialog.tsx`). `--max-warnings=0` öncesi temizle. · `S`
+- [ ] **a11y otomasyonu** — `eslint-plugin-jsx-a11y` + Playwright içinde `axe`. · `S`
+- [ ] **(P3) Storybook** — `ui/` bileşen kataloğu + görsel regresyon. · `L`
+
+### 3.3 Backend / servisler (P1–P2)
+
+- [ ] **Test projelerini geri getir** — `tests/AuctionService.Tests` ve `tests/SearchService.Tests` altında yalnız `bin/obj` var; `.csproj` ve kaynak **yok**. Testleri yazıp CI'a `dotnet test` ekle (şu an bilinçli olarak yok). · `M`
+- [ ] **`ASPNETCORE_ENVIRONMENT`** — prod'da tüm .NET servisleri **`Development`**; Identity `UseDeveloperExceptionPage()` açıyor (stack trace sızabilir). `Production`'a al + `appsettings.Production.json`. · `S` **(güvenlik)**
+- [ ] **Healthcheck'ler** — `/health` (liveness/readiness) + compose `healthcheck` (şu an yalnız postgres/rabbitmq/meili için var), gateway'de aggregate health. · `S`
+- [ ] **OpenAPI / Swagger** — gateway'de birleşik doküman (`/carsties/api/openapi`). · `M`
+- [ ] **Migration stratejisi** — startup'ta otomatik migrate yerine ayrı "migrate" adımı; geri alma ve seed kontrolü. · `M`
+- [ ] **Gözlemlenebilirlik** — OpenTelemetry (trace/metric/log), uçtan uca `correlation-id`, Serilog → Loki/Grafana Cloud. · `M`
+- [ ] **Rate limiting / brute-force** — Identity `/connect/token` + login uçlarında `RateLimiter`. · `M`
+- [ ] **Idempotency** — bid POST'larında `Idempotency-Key`, çift teklif koruması. · `M`
+- [ ] **Yarış koşulları** — bid → auction güncellemesinde optimistic concurrency (`RowVersion`), outbox/inbox pattern. · `L`
+- [ ] **SignalR ölçeklenebilirlik** — auth (`accessTokenFactory`), reconnect/backoff, çok instance için Redis backplane. · `M`
+- [ ] **Identity tamamlanması** — e-posta doğrulama, şifre sıfırlama, hesap kilitleme, (opsiyonel) 2FA. · `L`
+- [ ] **gRPC sertleştirme** — servisler arası TLS/mTLS, deadline/timeout politikaları. · `M`
+
+### 3.4 CI/CD ve operasyon (P1)
+
+- [ ] **GitHub secrets** — `VPS_HOST=185.93.70.199`, `VPS_USER=root`, `VPS_SSH_KEY` (`~/.ssh/vps_ed25519` private içeriği), `GHCR_USER`, `GHCR_PAT`. Secrets yokken her push'ta **deploy job'ı fail** olur. · `S`
+- [ ] **Deploy job'ı doğrula** — secrets sonrası ilk push ile `deploy` adımını yeşile çevir; `sha-*` imajının VPS'e indiğini kontrol et. · `S`
+- [ ] **Staging ortamı** — ayrı compose/env (staging path veya subdomain), merge öncesi otomatik deploy. · `L`
+- [ ] **Trivy + SBOM** — imaj taraması (CRITICAL/HIGH gate), `sbom: true`, (opsiyonel) cosign imzası. · `M`
+- [ ] **Branch protection** — `path-migration` için required checks (quality), PR şablonu, CODEOWNERS. · `S`
+- [ ] **Dependabot otomasyonu** — patch auto-merge; aylık `npm audit` / `dotnet list package --vulnerable` rutini. · `S`
+- [ ] **Yedekleme** — `pg_dump` cron (auctions/bids/identity) + offsite (S3/rclone) + **restore tatbikatı**. · `M`
+- [ ] **İzleme & alarm** — uptime (healthchecks.io/Uptime Kuma), disk %80, RAM/swap, restart sayacı; Telegram/e-posta bildirimi. · `M`
+- [ ] **Log yönetimi** — `json-file` rotasyonu var (10m×3); merkezi toplama (Loki/Grafana Cloud). · `M`
+- [ ] **Sertifika hijyeni** — `systemctl list-timers` ile `carsties-certs.timer` doğrula, eski `carsties` lineage'ini temizle, periyodik `renew --dry-run`. · `S`
+- [ ] **Rollback tatbikatı** — `IMAGE_TAG=sha-<eski>` ile geri dönüşü yazılı prosedüre bağla, bir kez prova et. · `S`
+- [ ] **Sunucu sertleştirme** — SSH key-only + `fail2ban`, root login kapalı (CI için ayrı deploy kullanıcısı), `docker system prune` cron, swap/overcommit (3.5 GiB RAM). · `M`
+- [ ] **(Opsiyonel) CI → WireGuard** — 22 portunu internetten kapatıp deploy'u WireGuard üzerinden yapmak. · `M`
+
+### 3.5 Dokümantasyon (P2)
+
+- [ ] `specs/web-app.md` ve `specs/identity-service.md`'yi yeni URL şeması / `PathBase` / callback yolu ile gözden geçir (kısmen güncellendi).
+- [ ] README'ye **Mermaid** mimari diyagramı (edge → web-app/gateway/identity → servisler).
+- [ ] **ADR**'ler: (1) neden path tabanlı tek domain, (2) neden statik edge nginx (acme-companion yerine), (3) neden GHCR + pull modeli (VPS'te build yok).
+- [ ] Runbook: sertifika yenileme, rollback, DB restore, incident müdahalesi.
+- [ ] API dokümanı (`/openapi`) hazır olduğunda README'ye link.
+
+---
+
+## 4. Bilinen teknik borç ve riskler
+
+| Konu | Etki | Öneri | Öncelik |
+|---|---|---|---|
+| Prod'da `ASPNETCORE_ENVIRONMENT=Development` | Ayrıntılı hata sayfası / log sızıntısı | `Production` + `appsettings.Production.json` | **P1** |
+| Otomatik test yok (`tests/*` boş) | Regresyon riski, güvenli refactor imkânsız | dotnet test + Playwright smoke | **P1** |
+| `main` dalı farklı bir hatta (kurs spec'leri) | Yanlış dal deploy riski, karışıklık | Branch stratejisini ADR ile yazılı hale getir | **P1** |
+| GitHub secrets yok | Otomatik deploy çalışmıyor | Secrets ekle | **P1** |
+| Yedekleme yok | Veri kaybı | `pg_dump` + offsite + restore provası | **P1** |
+| Tek VPS / 3.5 GiB RAM | OOM, tek nokta arıza | Swap + kaynak limitleri + alarm | P2 |
+| CSP yok | XSS yüzeyi | Report-Only ile başla | P2 |
+| `deploy/.env` elle yönetiliyor | Secret rotasyonu yok | Rotasyon takvimi / sır yöneticisi | P2 |
+| Eski `app./api./id.` sertifika lineage'i | Karışıklık, gereksiz yenileme | Temizle | P3 |
+| `next/image` `remotePatterns` geniş | Optimizer üzerinden SSRF yüzeyi | Yalnız kullanılan host'lar | P3 |
+| Issuer değişikliği (02.11.2026) | Eski token/oturumlar geçersiz | Bilinçli kırıcı değişiklik — dokümante edildi | ✅ |
+
+---
+
+## 5. Önerilen sıra (ilk 2 hafta)
+
+1. GitHub secrets → deploy job'ı yeşil, uçtan uca otomatik deploy provası. (P1 · S)
+2. `ASPNETCORE_ENVIRONMENT=Production` + `UseDeveloperExceptionPage` kapatma. (P1 · S)
+3. **Responsive tasarım** + **koyu/açık tema seçici** — kullanıcıya görünen en hızlı kazanım. (P1 · M)
+4. Test iskeleti: `dotnet test` + Playwright login→bid smoke, CI'a bağla. (P1 · M)
+5. Yedekleme + izleme/alarm. (P1 · M)
+6. CSP (Report-Only) + güvenlik başlıkları, lint borcunun temizlenmesi. (P2 · M)
+
+---
+
+## 6. Hızlı doğrulama komutları
+
+```bash
+# Canlı uçlar
+curl -sI https://umitsengul.online/ | head -2
+curl -sI https://umitsengul.online/carsties | head -2
+curl -s  https://umitsengul.online/carsties/id/.well-known/openid-configuration | head -c 200
+curl -s -o /dev/null -w '%{http_code}\n' https://umitsengul.online/carsties/api/auctions
+
+# Sertifika
+echo | openssl s_client -connect umitsengul.online:443 -servername umitsengul.online 2>/dev/null \
+  | openssl x509 -noout -subject -issuer -dates
+
+# VPS
+ssh vps 'cd /opt/carsties && docker compose --env-file deploy/.env \
+  -f docker-compose.yml -f deploy/docker-compose.prod.yml ps'
+ssh vps 'docker exec nginx-proxy nginx -t'
+ssh vps 'git -C /opt/carsties log --oneline -3; systemctl list-timers "carsties-*" --no-pager'
+
+# Yerel geliştirme / kalite kapıları
+docker compose up -d --build
+cd frontend/web-app && npm ci && npm run lint && npm run build
+cd ../.. && dotnet build Carsties.sln && dotnet package list --vulnerable --include-transitive
+```
+
+---
+
+## 7. Değişiklik günlüğü
+
+| Tarih | Not |
+|---|---|
+| 02.11.2026 | Tek domain + path tabanlı yayına geçiş; statik edge nginx + landing sayfası; Identity `PathBase`; better-auth 1.7 migrasyonu; bağımlılık güvenlik yükseltmeleri (runtime 0 açık); GHCR + GitHub Actions CI/CD; Let's Encrypt sertifikası; yayında bulunan 7 hata düzeltildi. |
+
+
+
