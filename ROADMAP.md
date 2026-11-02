@@ -188,6 +188,10 @@ Efor: S (≤ yarım gün) · M (1–2 gün) · L (3+ gün).
 | `deploy/.env` elle yönetiliyor | Secret rotasyonu yok | Rotasyon takvimi / sır yöneticisi | P2 |
 | Eski `app./api./id.` sertifika lineage'i | Karışıklık, gereksiz yenileme | Temizle | P3 |
 | `next/image` `remotePatterns` geniş | Optimizer üzerinden SSRF yüzeyi | Yalnız kullanılan host'lar | P3 |
+| **Public repo + canlı demo hesapları** (`alice`/`bob`, parolalar README'de) | Herkes giriş yapıp ilan/teklif açabilir, kendi ilanını silebilir | Hesapları kilitle veya parolaları değiştir; README'den kaldır (bkz. §6) | **P1** |
+| **Brute-force koruması yok** (login/token + SSH) | Parola denemesi, log/kaynak tüketimi (24s'de 74 başarısız SSH denemesi) | nginx `limit_req` + ASP.NET `RateLimiter` + fail2ban | **P1** |
+| **Public repoda altyapı bilgisi** (VPS IP, `root`, port 22, WireGuard) | Hedef keşfi kolaylaşır | Dokümanı placeholder'a çevir / private doc'a taşı (bkz. §6) | P2 |
+| Client secret repoda sabit (`NotASecret`) + ROPC açık | Kullanıcı adı bilinirse token endpoint'inden parola denemesi | Secret'ı env'e taşı, ROPC'yi prod'da kapat | P2 |
 | Issuer değişikliği (02.11.2026) | Eski token/oturumlar geçersiz | Bilinçli kırıcı değişiklik — dokümante edildi | ✅ |
 
 ---
@@ -203,7 +207,68 @@ Efor: S (≤ yarım gün) · M (1–2 gün) · L (3+ gün).
 
 ---
 
-## 6. Hızlı doğrulama komutları
+## 6. Public repo & GHCR — maruz kalma değerlendirmesi (02.11.2026)
+
+Repo ve GHCR paketleri **public** yapıldı. Aşağıdaki değerlendirme 02.11.2026'da yapıldı;
+maddeler **bilinçli olarak uygulanmadı**, karar bekliyor (bkz. 6.4).
+
+### 6.1 Kontrol edildi — temiz
+
+| Kontrol | Sonuç |
+|---|---|
+| Git geçmişinde sır | `.env.example` (yalnız placeholder) + geçmişte `frontend/web-app/.env.production` (içeriği yalnız `https://id.carsties.test`, `https://api.carsties.test`) → sır yok |
+| Repoda anahtar/token deseni | `ghp_`, `github_pat_`, `AKIA…`, `BEGIN … PRIVATE KEY` → **0 eşleşme** |
+| İmaj içeriğinde sır | `web-app` imaj ENV yalnız `NODE_ENV/PORT/HOSTNAME/NODE_VERSION`; `BETTER_AUTH_SECRET` build ARG'ı ENV'e yazılmıyor |
+| GHCR public olması | Kaynak zaten public, imajda sır yok; **yazma yetkisi** yalnız CI'da (`GITHUB_TOKEN`) → `latest` dışarıdan ezilemez |
+| `deploy/.env` | Hiç commit edilmemiş; VPS'te `chmod 600` |
+| SSH sertleştirme | `passwordauthentication no`, `permitrootlogin without-password`, `pubkeyauthentication yes` |
+
+### 6.2 Tespit edilen riskler (karar bekliyor)
+
+| # | Risk | Kanıt | Ciddiyet |
+|---|---|---|---|
+| 1 | Canlı **demo hesapları** ve parolaları public | `identity` DB'de `alice`, `bob`; `README.md`'de “alice / Pass123$”; ROPC ile token alınabildiği doğrulandı | **Yüksek** |
+| 2 | **Altyapı bilgisi ifşası** | `deploy/README-vps.md` + bu dosyada VPS public IP, WireGuard IP, `root`, port 22, sağlayıcı | Orta |
+| 3 | **Brute-force / rate limit yok** | nginx'te `limit_req` yok, ASP.NET `RateLimiter` yok, fail2ban kurulu değil; son 24 saatte 74 başarısız SSH denemesi | Orta |
+| 4 | **Client secret repoda sabit** + ROPC açık | `src/IdentityService/Config.cs`: `new Secret("NotASecret")`, `GrantTypes.ResourceOwnerPassword` (`bruno` client) | Orta |
+| 5 | Prod'da `ASPNETCORE_ENVIRONMENT=Development` | Identity `UseDeveloperExceptionPage()` açık → stack trace sızabilir | Orta |
+| 6 | Kaynak kodun görünürlüğü | Endpoint/framework sürümleri haritalanabilir | Düşük (kabul edilebilir) |
+
+> Not: “public repo” tek başına açık değildir. Riski yaratan kombinasyon: **zayıf demo kimlik bilgileri + rate limit yokluğu + ayrıntılı hata sayfası**.
+
+### 6.3 Riskleri kapatma adımları (uygulanmadı — onay bekliyor)
+
+- [ ] **Demo hesapları devre dışı bırak** (canlı veri etkisi var!)
+  ```sql
+  -- alice/bob mevcut ilanların sahibiyse o ilanlar düzenlenemez hale gelir (admin yok)
+  UPDATE "AspNetUsers" SET "LockoutEnd" = '9999-12-31 00:00:00+00', "LockoutEnabled" = true
+  WHERE "UserName" IN ('alice','bob');
+  ```
+  Alternatif: parolaları güçlü rastgele değerlerle değiştir, hesapları silme (veri bütünlüğü).
+- [ ] `README.md`'den “Test hesapları: alice / Pass123$” satırını kaldır (public repoda parola yayınlama).
+- [ ] `deploy/README-vps.md` ve bu dosyadaki **public IP / WireGuard IP / kullanıcı adı / port** bilgilerini `<VPS_IP>` benzeri yer tutuculara çevir; gerçek değerleri repo dışında (private not) tut.
+- [ ] **nginx rate limit** (`/carsties/id/connect/token`, `/carsties/id/Account/Login`):
+  ```nginx
+  # http seviyesinde
+  limit_req_zone $binary_remote_addr zone=login:10m rate=10r/m;
+  # ilgili location'larda
+  limit_req zone=login burst=5 nodelay;
+  ```
+- [ ] **Identity tarafında** `AddRateLimiter` + login/token uçlarına politika; başarısız giriş sayacı ve kilitleme (`MaxFailedAccessAttempts`).
+- [ ] **fail2ban** kur (`dnf install fail2ban`, `sshd` jail) — 22 portundaki bot denemelerini sınırla.
+- [ ] Client secret'ı **env'den** oku (`config["NextAppClientSecret"]`), güçlü rastgele değer üret, `bruno`/ROPC client'ını yalnız `Development` ortamında kaydet.
+- [ ] `ASPNETCORE_ENVIRONMENT=Production` + `appsettings.Production.json` (bkz. §4).
+- [ ] GitHub ayarları: *Settings → Actions → Fork pull request workflows: Require approval*, *Settings → Code security: Private vulnerability reporting* + **Secret scanning / Push protection** (public repoda ücretsiz), Dependabot alerts.
+
+### 6.4 Karar durumu
+
+| Tarih | Karar |
+|---|---|
+| 02.11.2026 | **Hiçbir değişiklik uygulanmadı.** Sahibi (Ümit Şengül) riskleri bilerek şimdilik kabul etti; 6.3'teki maddeler daha sonra tek tek ele alınacak. |
+
+---
+
+## 7. Hızlı doğrulama komutları
 
 ```bash
 # Canlı uçlar
@@ -230,11 +295,12 @@ cd ../.. && dotnet build Carsties.sln && dotnet package list --vulnerable --incl
 
 ---
 
-## 7. Değişiklik günlüğü
+## 8. Değişiklik günlüğü
 
 | Tarih | Not |
 |---|---|
 | 02.11.2026 | Tek domain + path tabanlı yayına geçiş; statik edge nginx + landing sayfası; Identity `PathBase`; better-auth 1.7 migrasyonu; bağımlılık güvenlik yükseltmeleri (runtime 0 açık); GHCR + GitHub Actions CI/CD; Let's Encrypt sertifikası; yayında bulunan 7 hata düzeltildi. |
+| 02.11.2026 | Repo + GHCR public yapıldı → **maruz kalma değerlendirmesi** eklendi (§6). Sır sızıntısı yok; 5 risk tespit edildi, kapatma adımları **onay bekliyor** (bilinçli olarak uygulanmadı). |
 
 
 
