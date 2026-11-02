@@ -169,7 +169,10 @@ services:
       - "80:80"
       - "443:443"
     volumes: !override
-      - ./deploy/nginx/edge.conf:/etc/nginx/conf.d/default.conf:ro
+      # DIZIN mount (tek dosya degil): git reset/checkout dosyayi yeni inode ile
+      # degistirdiginde tek dosya mount eski icerigi gosterir; dizin mount
+      # sayesinde `nginx -s reload` yeni yapilandirmayi gorur.
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./deploy/landing:/usr/share/nginx/landing:ro
       - nginx-certs:/etc/nginx/certs:ro
       - nginx-html:/usr/share/nginx/html

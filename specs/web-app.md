@@ -36,7 +36,7 @@ Production serves the app under `https://umitsengul.online/carsties` instead of 
 
 - `next.config.ts` sets `basePath` from `NEXT_PUBLIC_BASE_PATH` (empty locally → `http://localhost:3000/`, `/carsties` in prod)
 - better-auth uses `baseURL=BETTER_AUTH_URL` (origin only, e.g. `https://umitsengul.online`) + `basePath=${NEXT_PUBLIC_BASE_PATH}/api/auth`; the OAuth callback therefore becomes `/carsties/api/auth/callback/duende`
-- `/carsties/api/auth/*` must be routed to the Next.js app, not to the gateway (`deploy/nginx/edge.conf` places that `location` above `/carsties/api/`)
+- `/carsties/api/auth/*` must be routed to the Next.js app, not to the gateway (`deploy/nginx/conf.d/default.conf` places that `location` above `/carsties/api/`)
 - `NEXT_PUBLIC_*` values are baked at build time (`frontend/web-app/Dockerfile` args, filled by CI)
 
 ## Pages / Routes

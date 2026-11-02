@@ -24,7 +24,7 @@ Issuer: `https://umitsengul.online/carsties/id` · Client redirect URI:
 
 | servis | imaj | dış port |
 |---|---|---|
-| `nginx-proxy` (edge, `container_name` sabit) | `nginx:alpine` + `deploy/nginx/edge.conf` | **80, 443** |
+| `nginx-proxy` (edge, `container_name` sabit) | `nginx:alpine` + `deploy/nginx/conf.d/default.conf` | **80, 443** |
 | `carsties-web-app-1` | `ghcr.io/umitsengul/carstieslive-web-app` | `127.0.0.1:3000` |
 | `carsties-gateway-svc-1` | `ghcr.io/umitsengul/carstieslive-gateway-svc` | - |
 | `carsties-identity-svc-1` | `ghcr.io/umitsengul/carstieslive-identity-svc` | - |
@@ -32,7 +32,7 @@ Issuer: `https://umitsengul.online/carsties/id` · Client redirect URI:
 | `carsties-postgres-1`, `rabbitmq`, `meilisearch` | upstream | - |
 
 `nginx-proxy` artık docker-gen kullanmıyor: tek alan adı için **statik** yapılandırma
-(`deploy/nginx/edge.conf`) mount edilir. `VIRTUAL_HOST` / `LETSENCRYPT_HOST` değişkenleri prod'da kullanılmaz.
+(`deploy/nginx/conf.d/default.conf`) mount edilir. `VIRTUAL_HOST` / `LETSENCRYPT_HOST` değişkenleri prod'da kullanılmaz.
 
 ## 3) Deploy (GitHub Actions)
 
@@ -130,7 +130,7 @@ Tarayıcı akışı: `/carsties/` → `Login` → `https://umitsengul.online/car
 |---|---|
 | `docker-compose.yml` | imajlar `ghcr.io/umitsengul/carstieslive-*:${IMAGE_TAG:-latest}` + `build:` (lokal) |
 | `deploy/docker-compose.prod.yml` | statik edge nginx, `pull_policy: always`, tek domain env'leri, `PathBase` |
-| `deploy/nginx/edge.conf` | path bazlı yönlendirme + TLS + WebSocket + HSTS |
+| `deploy/nginx/conf.d/default.conf` | path bazlı yönlendirme + TLS + WebSocket + HSTS |
 | `deploy/landing/index.html` | kök alan adı karşılama sayfası (Carsties linki) |
 | `deploy/certs.sh` | tek domain (`DOMAIN`) + `nginx -s reload` |
 | `deploy/deploy.sh` | VPS deploy betiği (git reset → pull → up → reload → smoke) |
