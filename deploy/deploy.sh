@@ -6,8 +6,8 @@
 #   ./deploy/deploy.sh
 #
 # Yaptigi isler:
-#   1) depoyu origin/<DEPLOY_BRANCH> ile esitler (varsayilan: main;
-#      Carsties kodu simdilik path-migration dalinda) - deploy/.env izlenmez, korunur
+#   1) depoyu origin/<DEPLOY_BRANCH> ile esitler (varsayilan: path-migration;
+#      bu repoda Carsties kodu o dalda yasar) - deploy/.env izlenmez, korunur
 #   2) GHCR'ye login (GHCR_USER/GHCR_PAT verilirse)
 #   3) imajlari ceker (IMAGE_TAG yoksa sha-<kisa commit>)
 #   4) servisleri gunceller (build YOK)
@@ -20,7 +20,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_DIR}"
 
-BRANCH="${DEPLOY_BRANCH:-main}"
+BRANCH="${DEPLOY_BRANCH:-path-migration}"
 REQUESTED_IMAGE_TAG="${IMAGE_TAG:-}"
 
 log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*"; }
