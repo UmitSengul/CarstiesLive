@@ -1,6 +1,15 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// nginx-proxy arkasinda TLS sonlandigi icin X-Forwarded-* basliklarini dikkate al.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
@@ -26,6 +35,8 @@ builder.Services.AddCors(options =>
 });
  
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 app.UseCors("customPolicy");
 

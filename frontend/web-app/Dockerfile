@@ -46,6 +46,16 @@ COPY . .
 
 ENV NODE_ENV=production
 
+# NEXT_PUBLIC_* degerleri BUILD zamaninda bundle'a gomulur (tarayici bunlari kullanir).
+# VPS build'inde deploy/docker-compose.prod.yml -> build.args ile verilir.
+ARG NEXT_PUBLIC_BASE_API=https://api.umitsengul.online
+ARG NEXT_PUBLIC_ID_URL=https://id.umitsengul.online
+ARG BETTER_AUTH_URL=https://app.umitsengul.online
+
+ENV NEXT_PUBLIC_BASE_API=$NEXT_PUBLIC_BASE_API \
+    NEXT_PUBLIC_ID_URL=$NEXT_PUBLIC_ID_URL \
+    BETTER_AUTH_URL=$BETTER_AUTH_URL
+
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.

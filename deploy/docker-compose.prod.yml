@@ -1,0 +1,177 @@
+# ============================================================
+# Carsties - VPS (production) override dosyasi
+#
+# Kullanim (VPS'te /opt/carsties icinde):
+#   docker compose --env-file deploy/.env \
+#     -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+#
+# Amac:
+#   - domain bazli VIRTUAL_HOST / LETSENCRYPT_HOST (nginx-proxy + acme-companion)
+#   - ic servislerin portlarini disariya kapatmak
+#   - secret'lari deploy/.env uzerinden vermek
+#   - restart: unless-stopped + log rotasyonu
+# ============================================================
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?deploy/.env icinde POSTGRES_PASSWORD gerekli}
+    logging: *default-logging
+
+  rabbitmq:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:?deploy/.env icinde RABBITMQ_PASS gerekli}
+    logging: *default-logging
+
+  meilisearch:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?deploy/.env icinde MEILI_MASTER_KEY gerekli (>=16 byte)}
+      MEILI_ENV: production
+    logging: *default-logging
+
+  auction-svc:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Username: ${RABBITMQ_USER:-guest}
+      RabbitMQ__Password: ${RABBITMQ_PASS}
+      ConnectionStrings__DefaultConnection: Server=postgres:5432;User Id=postgres;Password=${POSTGRES_PASSWORD};Database=auctions
+      IdentityServiceUrl: http://identity-svc
+      Kestrel__Endpoints__Http__Url: http://+:80
+      Kestrel__Endpoints__gRPC__Url: http://+:81
+      Kestrel__Endpoints__gRPC__Protocols: Http2
+    logging: *default-logging
+
+  bid-svc:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:80
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Username: ${RABBITMQ_USER:-guest}
+      RabbitMQ__Password: ${RABBITMQ_PASS}
+      ConnectionStrings__BidDbConnection: Server=postgres:5432;User Id=postgres;Password=${POSTGRES_PASSWORD};Database=bids
+      IdentityServiceUrl: http://identity-svc
+      GrpcAuctionServiceUrl: http://auction-svc:81
+    logging: *default-logging
+
+  search-svc:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:80
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Username: ${RABBITMQ_USER:-guest}
+      RabbitMQ__Password: ${RABBITMQ_PASS}
+      AuctionSvcUrl: http://auction-svc
+      Meilisearch__Url: http://meilisearch:7700
+      Meilisearch__ApiKey: ${MEILI_MASTER_KEY}
+    depends_on:
+      auction-svc:
+        condition: service_started
+    logging: *default-logging
+
+  notify-svc:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:80
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Username: ${RABBITMQ_USER:-guest}
+      RabbitMQ__Password: ${RABBITMQ_PASS}
+    logging: *default-logging
+
+  identity-svc:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:80
+      ConnectionStrings__DefaultConnection: Server=postgres:5432;User Id=postgres;Password=${POSTGRES_PASSWORD};Database=identity
+      IdentityServer__IssuerUri: https://${ID_HOST:?deploy/.env icinde ID_HOST gerekli}
+      ClientAppUrl: https://${APP_HOST:?deploy/.env icinde APP_HOST gerekli}
+      VIRTUAL_HOST: ${ID_HOST}
+      VIRTUAL_PORT: "80"
+      LETSENCRYPT_HOST: ${ID_HOST}
+    logging: *default-logging
+
+  gateway-svc:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:80
+      ClientApp: https://${APP_HOST}
+      VIRTUAL_HOST: ${API_HOST:?deploy/.env icinde API_HOST gerekli}
+      VIRTUAL_PORT: "80"
+      LETSENCRYPT_HOST: ${API_HOST}
+    logging: *default-logging
+
+  web-app:
+    restart: unless-stopped
+    build:
+      args:
+        NEXT_PUBLIC_BASE_API: https://${API_HOST}
+        NEXT_PUBLIC_ID_URL: https://${ID_HOST}
+        BETTER_AUTH_URL: https://${APP_HOST}
+    environment:
+      BETTER_AUTH_URL: https://${APP_HOST}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?deploy/.env icinde BETTER_AUTH_SECRET gerekli}
+      BASE_API_URL: http://gateway-svc
+      ID_URL_INTERNAL: http://identity-svc
+      VIRTUAL_HOST: ${APP_HOST}
+      VIRTUAL_PORT: "3000"
+      LETSENCRYPT_HOST: ${APP_HOST}
+    volumes: !reset []
+    ports: !override
+      - "127.0.0.1:3000:3000"
+    logging: *default-logging
+
+  nginx-proxy:
+    restart: unless-stopped
+    # Sabit ad: operasyon komutlarinda (docker exec nginx-proxy ...) kullanilir.
+    container_name: nginx-proxy
+    volumes: !override
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./local-deploy/proxy-buffers.conf:/etc/nginx/conf.d/proxy-buffers.conf:ro
+      - nginx-certs:/etc/nginx/certs
+      - nginx-vhost:/etc/nginx/vhost.d
+      - nginx-html:/usr/share/nginx/html
+    logging: *default-logging
+
+  # ------------------------------------------------------------------
+  # acme-companion KULLANILMIYOR (bilincli tercih):
+  #   nginx-proxy 1.11 imajinda PID 1 "forego"; acme-companion sertifika
+  #   kurulumundan sonra nginx-proxy'ye SIGHUP gonderiyor ve forego bunu
+  #   kapanis sinyali sayip proxy'yi durduruyor (Exited 0).
+  #   Bu yuzden sertifikalar deploy/certs.sh ile (certbot webroot) alinir:
+  #   PEM'ler nginx-certs volume'una <host>.crt / <host>.key olarak yazilir,
+  #   ardindan docker-gen bir ag olayi ile tetiklenip nginx -s reload eder.
+  #   Yenileme: carsties-certs.timer (gunde 1 kez, deploy/certs.sh renew).
+  # ------------------------------------------------------------------
+
+volumes:
+  nginx-certs:
+  nginx-vhost:
+  nginx-html:
+  letsencrypt:
+

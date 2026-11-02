@@ -4,6 +4,7 @@ using IdentityService.Data;
 using IdentityService.Models;
 using IdentityService.Services;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -55,6 +56,17 @@ internal static class HostingExtensions
     {
         _ = builder.Services.AddRazorPages();
 
+        // nginx-proxy (TLS sonlandirma) arkasinda calistigimiz icin X-Forwarded-Proto/For
+        // basliklarini dikkate al. Aksi halde discovery dokumanindaki endpoint'ler
+        // http:// olarak uretilir ve login POST'lari 301 ile GET'e donusur.
+        _ = builder.Services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            // Trafik yalnizca ic docker agindan geldigi icin bilinen proxy kisitlamasi kaldirilir.
+            options.KnownNetworks.Clear();
+            options.KnownProxies.Clear();
+        });
+
         _ = builder.Services.AddDbContext<ApplicationDbContext>(options =>
             options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -102,6 +114,9 @@ internal static class HostingExtensions
     public static WebApplication ConfigurePipeline(this WebApplication app)
     {
         _ = app.UseSerilogRequestLogging();
+
+        // ForwardedHeaders, kimlik/yetkilendirme ve routing'den ONCE calismali.
+        _ = app.UseForwardedHeaders();
 
         if (app.Environment.IsDevelopment())
         {

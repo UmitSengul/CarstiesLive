@@ -42,11 +42,23 @@ public class Index(UserManager<ApplicationUser> userManager, IConfiguration conf
 
         var result = await userManager.CreateAsync(user, Input.Password!);
 
-        if (result.Succeeded)
+        if (!result.Succeeded)
         {
-            await userManager.AddClaimsAsync(user, 
-                [new Claim(JwtClaimTypes.Name, Input.FullName!)]);
+            // Identity hatalarini (parola politikasi, kullanici adi zaten var vb.)
+            // ekrana bas. Aksi halde kayit basarisiz olsa da "Successfully registered!"
+            // gorunuyor ve kullanici login'de "invalid credentials" aliyor.
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+
+            RegisterSuccess = false;
+
+            return Page();
         }
+
+        await userManager.AddClaimsAsync(user,
+            [new Claim(JwtClaimTypes.Name, Input.FullName!)]);
 
         RegisterSuccess = true;
 
