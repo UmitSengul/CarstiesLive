@@ -118,6 +118,15 @@ internal static class HostingExtensions
         // ForwardedHeaders, kimlik/yetkilendirme ve routing'den ONCE calismali.
         _ = app.UseForwardedHeaders();
 
+        // Ters proxy altinda alt yol (subpath) dagitimi: prod'da PathBase=/carsties/id.
+        // Discovery dokumani, authorize/token endpoint'leri, cerez yollari ve
+        // yonlendirmeler bu onekle uretilir. Bos ise (lokal dev) hicbir sey degismez.
+        var pathBase = app.Configuration["PathBase"];
+        if (!string.IsNullOrWhiteSpace(pathBase))
+        {
+            _ = app.UsePathBase(pathBase);
+        }
+
         if (app.Environment.IsDevelopment())
         {
             _ = app.UseDeveloperExceptionPage();

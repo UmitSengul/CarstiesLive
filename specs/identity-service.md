@@ -53,7 +53,7 @@ None.
 |ClientId|Grant Type|Notes|
 |---|---|---|
 |bruno|Resource Owner Password|For direct API testing via the Bruno client; scopes: openid, profile, email, auctionApp|
-|nextApp|Authorization Code + PKCE|The Next.js frontend; redirect URI = `{ClientAppUrl}/api/auth/oauth2/callback/duende`; scopes: openid, profile, email, auctionApp; access token lifetime 30 days|
+|nextApp|Authorization Code + PKCE|The Next.js frontend; redirect URI = `{ClientAppUrl}/api/auth/callback/duende` (better-auth 1.7 default callback path); scopes: openid, profile, email, auctionApp; access token lifetime 30 days|
 
 **Custom claims** (`CustomProfileService`): every issued token gets a `username` claim (the ASP.NET Identity username), `email`, `email_verified`, and — if set — a `name` claim. Downstream services (AuctionService, BidService, GatewayService) all set `TokenValidationParameters.NameClaimType = "username"`, so `User.Identity.Name` resolves to this claim, not the default `sub`/`name`.
 

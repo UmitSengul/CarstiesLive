@@ -3,10 +3,11 @@
 #
 # Kullanim (VPS'te /opt/carsties icinde):
 #   docker compose --env-file deploy/.env \
-#     -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+#     -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d
 #
 # Amac:
-#   - domain bazli VIRTUAL_HOST / LETSENCRYPT_HOST (nginx-proxy + acme-companion)
+#   - tek alan adi (DOMAIN) altinda path bazli yayin -> edge nginx (statik config)
+#   - uygulama imajlari GHCR'den cekilir (CI'da build edilir; VPS'te build yok)
 #   - ic servislerin portlarini disariya kapatmak
 #   - secret'lari deploy/.env uzerinden vermek
 #   - restart: unless-stopped + log rotasyonu
@@ -45,6 +46,7 @@ services:
 
   auction-svc:
     restart: unless-stopped
+    pull_policy: always
     ports: !reset []
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -52,7 +54,7 @@ services:
       RabbitMQ__Username: ${RABBITMQ_USER:-guest}
       RabbitMQ__Password: ${RABBITMQ_PASS}
       ConnectionStrings__DefaultConnection: Server=postgres:5432;User Id=postgres;Password=${POSTGRES_PASSWORD};Database=auctions
-      IdentityServiceUrl: http://identity-svc
+      IdentityServiceUrl: http://identity-svc/carsties/id
       Kestrel__Endpoints__Http__Url: http://+:80
       Kestrel__Endpoints__gRPC__Url: http://+:81
       Kestrel__Endpoints__gRPC__Protocols: Http2
@@ -60,6 +62,7 @@ services:
 
   bid-svc:
     restart: unless-stopped
+    pull_policy: always
     ports: !reset []
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -68,12 +71,13 @@ services:
       RabbitMQ__Username: ${RABBITMQ_USER:-guest}
       RabbitMQ__Password: ${RABBITMQ_PASS}
       ConnectionStrings__BidDbConnection: Server=postgres:5432;User Id=postgres;Password=${POSTGRES_PASSWORD};Database=bids
-      IdentityServiceUrl: http://identity-svc
+      IdentityServiceUrl: http://identity-svc/carsties/id
       GrpcAuctionServiceUrl: http://auction-svc:81
     logging: *default-logging
 
   search-svc:
     restart: unless-stopped
+    pull_policy: always
     ports: !reset []
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -91,6 +95,7 @@ services:
 
   notify-svc:
     restart: unless-stopped
+    pull_policy: always
     ports: !reset []
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -102,76 +107,82 @@ services:
 
   identity-svc:
     restart: unless-stopped
+    pull_policy: always
     ports: !reset []
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:80
       ConnectionStrings__DefaultConnection: Server=postgres:5432;User Id=postgres;Password=${POSTGRES_PASSWORD};Database=identity
-      IdentityServer__IssuerUri: https://${ID_HOST:?deploy/.env icinde ID_HOST gerekli}
-      ClientAppUrl: https://${APP_HOST:?deploy/.env icinde APP_HOST gerekli}
-      VIRTUAL_HOST: ${ID_HOST}
-      VIRTUAL_PORT: "80"
-      LETSENCRYPT_HOST: ${ID_HOST}
+      # Issuer artik path iceriyor: https://<domain>/carsties/id
+      IdentityServer__IssuerUri: https://${DOMAIN:?deploy/.env icinde DOMAIN gerekli}/carsties/id
+      ClientAppUrl: https://${DOMAIN}/carsties
+      # IdentityServer'i alt yol altinda yayinla (discovery/cookie/redirect prefix'leri)
+      PathBase: /carsties/id
     logging: *default-logging
 
   gateway-svc:
     restart: unless-stopped
+    pull_policy: always
     ports: !reset []
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ASPNETCORE_URLS: http://+:80
-      ClientApp: https://${APP_HOST}
-      VIRTUAL_HOST: ${API_HOST:?deploy/.env icinde API_HOST gerekli}
-      VIRTUAL_PORT: "80"
-      LETSENCRYPT_HOST: ${API_HOST}
+      # CORS origin'de PATH OLMAZ (yalniz scheme + host + port).
+      ClientApp: https://${DOMAIN}
+      IdentityServiceUrl: http://identity-svc/carsties/id
     logging: *default-logging
 
   web-app:
     restart: unless-stopped
+    pull_policy: always
     build:
       args:
-        NEXT_PUBLIC_BASE_API: https://${API_HOST}
-        NEXT_PUBLIC_ID_URL: https://${ID_HOST}
-        BETTER_AUTH_URL: https://${APP_HOST}
+        NEXT_PUBLIC_BASE_API: https://${DOMAIN}/carsties/api
+        NEXT_PUBLIC_ID_URL: https://${DOMAIN}/carsties/id
+        BETTER_AUTH_URL: https://${DOMAIN}
+        NEXT_PUBLIC_BASE_PATH: /carsties
     environment:
-      BETTER_AUTH_URL: https://${APP_HOST}
+      BETTER_AUTH_URL: https://${DOMAIN}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?deploy/.env icinde BETTER_AUTH_SECRET gerekli}
+      # Sunucu tarafi cagrilar edge nginx'i atlar; gateway onegi yok.
       BASE_API_URL: http://gateway-svc
-      ID_URL_INTERNAL: http://identity-svc
-      VIRTUAL_HOST: ${APP_HOST}
-      VIRTUAL_PORT: "3000"
-      LETSENCRYPT_HOST: ${APP_HOST}
+      ID_URL_INTERNAL: http://identity-svc/carsties/id
     volumes: !reset []
     ports: !override
       - "127.0.0.1:3000:3000"
     logging: *default-logging
 
+  # ----------------------------------------------------------------
+  # Edge: tek alan adi icin STATIK nginx (nginx-proxy imajinin yerine).
+  # TLS burada sonlanir; sertifikalar deploy/certs.sh ile yazilir.
+  #   /                            -> statik karsilama sayfasi
+  #   /carsties/...                -> web-app
+  #   /carsties/api/auth/...       -> web-app (better-auth)
+  #   /carsties/api/...            -> gateway (onek silinir)
+  #   /carsties/id/...             -> identity (onek korunur)
+  # ----------------------------------------------------------------
   nginx-proxy:
     restart: unless-stopped
-    # Sabit ad: operasyon komutlarinda (docker exec nginx-proxy ...) kullanilir.
     container_name: nginx-proxy
+    image: nginx:1.29-alpine
+    ports: !override
+      - "80:80"
+      - "443:443"
     volumes: !override
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-      - ./local-deploy/proxy-buffers.conf:/etc/nginx/conf.d/proxy-buffers.conf:ro
-      - nginx-certs:/etc/nginx/certs
-      - nginx-vhost:/etc/nginx/vhost.d
+      - ./deploy/nginx/edge.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/landing:/usr/share/nginx/landing:ro
+      - nginx-certs:/etc/nginx/certs:ro
       - nginx-html:/usr/share/nginx/html
+    depends_on:
+      web-app:
+        condition: service_started
+      gateway-svc:
+        condition: service_started
+      identity-svc:
+        condition: service_started
     logging: *default-logging
-
-  # ------------------------------------------------------------------
-  # acme-companion KULLANILMIYOR (bilincli tercih):
-  #   nginx-proxy 1.11 imajinda PID 1 "forego"; acme-companion sertifika
-  #   kurulumundan sonra nginx-proxy'ye SIGHUP gonderiyor ve forego bunu
-  #   kapanis sinyali sayip proxy'yi durduruyor (Exited 0).
-  #   Bu yuzden sertifikalar deploy/certs.sh ile (certbot webroot) alinir:
-  #   PEM'ler nginx-certs volume'una <host>.crt / <host>.key olarak yazilir,
-  #   ardindan docker-gen bir ag olayi ile tetiklenip nginx -s reload eder.
-  #   Yenileme: carsties-certs.timer (gunde 1 kez, deploy/certs.sh renew).
-  # ------------------------------------------------------------------
 
 volumes:
   nginx-certs:
-  nginx-vhost:
   nginx-html:
   letsencrypt:
-

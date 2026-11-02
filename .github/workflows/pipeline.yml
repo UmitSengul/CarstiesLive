@@ -1,0 +1,162 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NS: ghcr.io/umitsengul/carstieslive
+  DOTNET_VERSION: "10.0.x"
+  NODE_VERSION: "24"
+  # web-app imajina build-time gomulen degerler
+  PUBLIC_DOMAIN: umitsengul.online
+  PUBLIC_BASE_PATH: /carsties
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Build & test (.NET + Next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: dotnet restore
+        run: dotnet restore Carsties.sln
+
+      - name: dotnet build
+        run: dotnet build Carsties.sln --no-restore -c Release
+
+      # NuGet audit (transitif dahil): bilinen acik varsa job kirilir
+      - name: NuGet vulnerability gate
+        run: |
+          dotnet package list --vulnerable --include-transitive --format json > /tmp/vuln.json
+          cat /tmp/vuln.json
+          jq -e '[.projects[] | select(.frameworks != null and (.frameworks | length > 0))] | length == 0' /tmp/vuln.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/web-app/package-lock.json
+
+      - name: npm ci
+        working-directory: frontend/web-app
+        run: npm ci --no-audit --no-fund
+
+      # Runtime bagimliliklarinda HIGH/CRITICAL varsa kirilir (dev bagimliliklari haric)
+      - name: npm audit (runtime)
+        working-directory: frontend/web-app
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: npm lint
+        working-directory: frontend/web-app
+        run: npm run lint
+
+      - name: next build
+        working-directory: frontend/web-app
+        env:
+          BETTER_AUTH_SECRET: ci-build-only-secret-not-used-at-runtime
+        run: npm run build
+
+  build-and-push:
+    name: Build & push ${{ matrix.name }}
+    if: github.event_name != 'pull_request'
+    needs: [quality]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: auction-svc
+            context: .
+            dockerfile: src/AuctionService/Dockerfile
+          - name: bid-svc
+            context: .
+            dockerfile: src/BidService/Dockerfile
+          - name: search-svc
+            context: .
+            dockerfile: src/SearchService/Dockerfile
+          - name: notify-svc
+            context: .
+            dockerfile: src/NotificationService/Dockerfile
+          - name: identity-svc
+            context: .
+            dockerfile: src/IdentityService/Dockerfile
+          - name: gateway-svc
+            context: .
+            dockerfile: src/GatewayService/Dockerfile
+          - name: web-app
+            context: frontend/web-app
+            dockerfile: Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NS }}-${{ matrix.name }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short,prefix=sha-
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          build-args: |
+            BUILD_CONFIGURATION=Release
+            NEXT_PUBLIC_BASE_API=https://${{ env.PUBLIC_DOMAIN }}${{ env.PUBLIC_BASE_PATH }}/api
+            NEXT_PUBLIC_ID_URL=https://${{ env.PUBLIC_DOMAIN }}${{ env.PUBLIC_BASE_PATH }}/id
+            NEXT_PUBLIC_BASE_PATH=${{ env.PUBLIC_BASE_PATH }}
+            BETTER_AUTH_URL=https://${{ env.PUBLIC_DOMAIN }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    name: Deploy to VPS
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            cd /opt/carsties
+            GHCR_USER='${{ secrets.GHCR_USER }}' GHCR_PAT='${{ secrets.GHCR_PAT }}' ./deploy/deploy.sh

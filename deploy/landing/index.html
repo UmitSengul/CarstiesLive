@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ümit Şengül</title>
+<meta name="description" content="Ümit Şengül — yazılım geliştirici. Carsties açık artırma demo uygulaması." />
+<meta name="color-scheme" content="light dark" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111827'/%3E%3Ctext x='50%25' y='56%25' font-family='system-ui,sans-serif' font-size='30' font-weight='700' fill='%2367e8f9' text-anchor='middle'%3EÜS%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #0b1020;
+    --bg-soft: #121a2f;
+    --fg: #e8ecf7;
+    --muted: #a4b0c9;
+    --accent: #67e8f9;
+    --accent-2: #a78bfa;
+    --border: rgba(255, 255, 255, 0.10);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f7fb;
+      --bg-soft: #ffffff;
+      --fg: #14192b;
+      --muted: #5b6480;
+      --accent: #0891b2;
+      --accent-2: #7c3aed;
+      --border: rgba(20, 25, 43, 0.10);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    background:
+      radial-gradient(900px 500px at 15% -10%, rgba(103, 232, 249, 0.18), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, rgba(167, 139, 250, 0.18), transparent 60%),
+      var(--bg);
+    color: var(--fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    width: 100%;
+    max-width: 680px;
+    background: color-mix(in srgb, var(--bg-soft) 88%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 44px 36px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 12px;
+    margin-bottom: 22px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  h1 { margin: 0 0 10px; font-size: clamp(30px, 5vw, 44px); line-height: 1.15; letter-spacing: -0.02em; }
+  .lead { margin: 0 0 28px; color: var(--muted); font-size: 17px; }
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 22px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #08101f;
+    font-weight: 650;
+    font-size: 16px;
+    text-decoration: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 10px 26px rgba(103, 232, 249, 0.25);
+  }
+  .cta:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(103, 232, 249, 0.32); }
+  .cta:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .links { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 26px; font-size: 14px; }
+  .links a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; }
+  .links a:hover { color: var(--fg); border-bottom-color: var(--border); }
+  footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+  @media (max-width: 480px) {
+    main { padding: 32px 22px; border-radius: 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <span class="badge"><span class="dot"></span>umitsengul.online</span>
+  <h1>Ümit Şengül</h1>
+  <p class="lead">
+    Yazılım geliştirici. Dağıtık sistemler, .NET mikroservisler ve Next.js.
+    Aşağıdaki bağlantıdan açık artırma demo uygulaması <strong>Carsties</strong>'e göz atabilirsin.
+  </p>
+
+  <a class="cta" href="/carsties/">Carsties — Açık Artırma Demo <span aria-hidden="true">→</span></a>
+
+  <div class="links">
+    <a href="https://github.com/UmitSengul" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <a href="https://github.com/UmitSengul/CarstiesLive" target="_blank" rel="noopener noreferrer">Proje deposu</a>
+  </div>
+
+  <footer>
+    Carsties; Next.js, Duende IdentityServer, YARP gateway ve RabbitMQ üzerine kurulu bir mikroservis demo projesidir.
+  </footer>
+</main>
+</body>
+</html>

@@ -14,7 +14,7 @@ services:
       timeout: 5s
       retries: 5
   meilisearch:
-    image: getmeili/meilisearch:latest
+    image: getmeili/meilisearch:v1.56.0
     environment:
       MEILI_MASTER_KEY: masterkey
     ports:
@@ -42,7 +42,7 @@ services:
       timeout: 5s
       retries: 5
   auction-svc:
-    image: trycatchlearn/auction-svc:latest
+    image: ghcr.io/umitsengul/carstieslive-auction-svc:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: src/AuctionService/Dockerfile
@@ -63,7 +63,7 @@ services:
       rabbitmq:
         condition: service_healthy
   search-svc:
-    image: trycatchlearn/search-svc:latest
+    image: ghcr.io/umitsengul/carstieslive-search-svc:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: src/SearchService/Dockerfile
@@ -82,7 +82,7 @@ services:
       rabbitmq:
         condition: service_healthy
   identity-svc:
-    image: trycatchlearn/identity-svc:latest
+    image: ghcr.io/umitsengul/carstieslive-identity-svc:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: src/IdentityService/Dockerfile
@@ -101,7 +101,7 @@ services:
       postgres:
         condition: service_healthy
   gateway-svc:
-    image: trycatchlearn/gateway-svc:latest
+    image: ghcr.io/umitsengul/carstieslive-gateway-svc:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: src/GatewayService/Dockerfile
@@ -112,7 +112,7 @@ services:
     ports:
       - "6001:80"
   bid-svc:
-    image: trycatchlearn/bid-svc:latest
+    image: ghcr.io/umitsengul/carstieslive-bid-svc:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: src/BidService/Dockerfile
@@ -131,7 +131,7 @@ services:
       rabbitmq:
         condition: service_healthy
   notify-svc:
-    image: trycatchlearn/notify-svc:latest
+    image: ghcr.io/umitsengul/carstieslive-notify-svc:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: src/NotificationService/Dockerfile
@@ -147,7 +147,7 @@ services:
       rabbitmq:
         condition: service_healthy
   web-app:
-    image: trycatchlearn/web-app
+    image: ghcr.io/umitsengul/carstieslive-web-app:${IMAGE_TAG:-latest}
     build:
       context: ./frontend/web-app
       dockerfile: Dockerfile

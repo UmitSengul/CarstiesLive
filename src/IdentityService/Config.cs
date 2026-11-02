@@ -31,7 +31,9 @@ public static class Config
             ClientName = "NextApp Client",
             ClientSecrets = {new Secret("NotASecret".Sha256())},
             AllowedGrantTypes = GrantTypes.Code,
-            RedirectUris = {config["ClientAppUrl"] + "/api/auth/oauth2/callback/duende" },
+            // better-auth 1.7 varsayilan callback yolu: <baseURL>/callback/<providerId>
+            // baseURL = {ClientAppUrl}/api/auth  ->  {ClientAppUrl}/api/auth/callback/duende
+            RedirectUris = {config["ClientAppUrl"] + "/api/auth/callback/duende" },
             AllowedScopes = { "openid", "profile", "auctionApp" },
             AccessTokenLifetime = 3600 * 24 * 30
         }

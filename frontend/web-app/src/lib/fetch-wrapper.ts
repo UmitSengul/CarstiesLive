@@ -13,9 +13,15 @@ async function getAuthHeaders(): Promise<HeadersInit> {
         
         if (!getSessionCookie(reqHeaders)) return {};
         
+        // better-auth 1.7: getAccessToken artik providerId degil, hesabin (account)
+        // yerel id'sini ister. Once kullanicinin duende hesabini buluyoruz.
+        const accounts = await auth.api.listUserAccounts({headers: reqHeaders});
+        const account = accounts?.find((a) => a.providerId === 'duende');
+        if (!account) return {};
+        
         const {accessToken} = await auth.api.getAccessToken({
-            body: {providerId: 'duende'},
-            headers: await headers()
+            body: {accountId: account.id},
+            headers: reqHeaders
         });
         
         return accessToken ? {Authorization: `Bearer ${accessToken}`} : {}

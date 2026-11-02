@@ -2,7 +2,8 @@
 # ============================================================
 # Carsties - Let's Encrypt sertifika yonetimi (VPS)
 #
-#   ./deploy/certs.sh issue   # ilk sertifika (app/api/id tek SAN sertifikasi)
+#   ./deploy/certs.sh bootstrap # ilk kurulum: edge acilabilsin diye gecici self-signed sertifika
+#   ./deploy/certs.sh issue   # ilk sertifika (tek alan adi: DOMAIN)
 #   ./deploy/certs.sh renew   # periyodik yenileme (carsties-certs.timer cagirir)
 #   ./deploy/certs.sh dry-run # staging uzerinde uctan uca test (limit yakmaz)
 #
@@ -10,12 +11,9 @@
 # firewalld ile gecici olarak acilir ve is bitince kapatilir (bkz. fw_open_http).
 #
 # Neden acme-companion degil?
-#   nginx-proxy 1.11 imajinda PID 1 "forego". acme-companion sertifika
-#   kurulumundan sonra nginx-proxy'ye SIGHUP gonderiyor; forego bunu kapanis
-#   sinyali sayip proxy'yi durduruyor (Exited (0)). Bu yuzden sertifikalar
-#   certbot (HTTP-01 / webroot) ile alinip nginx-proxy'nin bekledigi yola
-#   (<host>.crt / <host>.key) yazilir; nginx-proxy'nin icindeki docker-gen
-#   bir ag olayi ile tetiklenip "nginx -s reload" yapar.
+#   Edge katmani statik yapilandirilmis nginx (deploy/nginx/edge.conf).
+#   Sertifikalar certbot (HTTP-01 / webroot) ile alinip nginx beklenen
+#   yola (<host>.crt / <host>.key) yazilir; ardindan "nginx -s reload" yapilir.
 # ============================================================
 set -euo pipefail
 
@@ -31,19 +29,16 @@ set -a
 . "${ENV_FILE}"
 set +a
 
-: "${APP_HOST:?deploy/.env icinde APP_HOST gerekli}"
-: "${API_HOST:?deploy/.env icinde API_HOST gerekli}"
-: "${ID_HOST:?deploy/.env icinde ID_HOST gerekli}"
+: "${DOMAIN:?deploy/.env icinde DOMAIN gerekli}"
 : "${ACME_EMAIL:?deploy/.env icinde ACME_EMAIL gerekli}"
 
 PROJECT="${COMPOSE_PROJECT_NAME:-carsties}"
 HTML_VOL="${PROJECT}_nginx-html"
 CERT_VOL="${PROJECT}_nginx-certs"
 LE_VOL="${PROJECT}_letsencrypt"
-NETWORK="${PROJECT}_default"
-CERT_NAME="carsties"
+CERT_NAME="carsties-prod"
 PROXY="nginx-proxy"
-HOSTS=("${APP_HOST}" "${API_HOST}" "${ID_HOST}")
+HOSTS=("${DOMAIN}")
 
 STAGING=()
 if [[ "${LETSENCRYPT_TEST:-false}" == "true" ]]; then
@@ -118,28 +113,46 @@ install_certs() {
 }
 
 reload_proxy() {
-  log "docker-gen tetikleniyor (ag connect/disconnect olayi)"
-  docker rm -f carsties-cert-trigger >/dev/null 2>&1 || true
-  docker run -d --rm --name carsties-cert-trigger --network "${NETWORK}" alpine:3 sleep 8 >/dev/null
-  sleep 4
-  docker rm -f carsties-cert-trigger >/dev/null 2>&1 || true
-  sleep 3
-
-  if ! docker exec "${PROXY}" sh -c 'grep -q ssl_certificate /etc/nginx/conf.d/default.conf'; then
-    log "UYARI: docker-gen config'i guncellemedi; ${PROXY} yeniden baslatiliyor"
-    docker restart "${PROXY}" >/dev/null
-    sleep 4
-  fi
+  log "nginx konfigurasyonu dogrulaniyor ve yeniden yukleniyor"
   docker exec "${PROXY}" nginx -t
+  docker exec "${PROXY}" nginx -s reload
+}
+
+# --- bootstrap ----------------------------------------------------------
+# Edge nginx, ssl_certificate dosyalari yoksa ACILAMAZ; certbot ise ACME
+# dogrulamasi icin edge'in 80 portunda ayakta olmasina ihtiyac duyar.
+# Bu yuzden ilk kurulumda once gecici bir self-signed sertifika yazilir,
+# stack ayaga kaldirilir, sonra gercek sertifika alinir (issue).
+ensure_cert_files() {
+  if docker run --rm -v "${CERT_VOL}:/certs" alpine:3 \
+       sh -c "test -s /certs/${DOMAIN}.crt && test -s /certs/${DOMAIN}.key" 2>/dev/null; then
+    log "Sertifika dosyalari mevcut: /certs/${DOMAIN}.crt"
+    return 0
+  fi
+
+  log "Gecici (self-signed) sertifika olusturuluyor: ${DOMAIN}"
+  docker run --rm -v "${CERT_VOL}:/certs" alpine:3 sh -c '
+    set -e
+    apk add --no-cache openssl >/dev/null 2>&1
+    openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+      -keyout "/certs/'"${DOMAIN}"'.key" -out "/certs/'"${DOMAIN}"'.crt" \
+      -subj "/CN='"${DOMAIN}"'" >/dev/null 2>&1
+    chmod 600 "/certs/'"${DOMAIN}"'.key"'
 }
 
 case "${1:-}" in
+  bootstrap)
+    # Ilk kurulum: edge nginx acilabilsin diye gecici sertifika yaz.
+    ensure_cert_files
+    log "Bitti. Simdi stack'i ayaga kaldir, ardindan: $0 issue"
+    ;;
   issue)
+    ensure_cert_files
     fw_open_http
     issue
     install_certs
     reload_proxy
-    log "Bitti. Kontrol: https://${APP_HOST} / https://${API_HOST}/auctions / https://${ID_HOST}"
+    log "Bitti. Kontrol: https://${DOMAIN}/ (landing) · https://${DOMAIN}/carsties/ · https://${DOMAIN}/carsties/api/auctions · https://${DOMAIN}/carsties/id/.well-known/openid-configuration"
     ;;
   renew)
     fw_open_http
@@ -160,7 +173,7 @@ case "${1:-}" in
     log "Dry-run basarili (sertifika degismedi)."
     ;;
   *)
-    echo "Kullanim: $0 {issue|renew|dry-run}" >&2
+    echo "Kullanim: $0 {bootstrap|issue|renew|dry-run}" >&2
     exit 2
     ;;
 esac

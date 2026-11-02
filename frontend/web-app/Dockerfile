@@ -48,13 +48,15 @@ ENV NODE_ENV=production
 
 # NEXT_PUBLIC_* degerleri BUILD zamaninda bundle'a gomulur (tarayici bunlari kullanir).
 # VPS build'inde deploy/docker-compose.prod.yml -> build.args ile verilir.
-ARG NEXT_PUBLIC_BASE_API=https://api.umitsengul.online
-ARG NEXT_PUBLIC_ID_URL=https://id.umitsengul.online
-ARG BETTER_AUTH_URL=https://app.umitsengul.online
+ARG NEXT_PUBLIC_BASE_API=https://umitsengul.online/carsties/api
+ARG NEXT_PUBLIC_ID_URL=https://umitsengul.online/carsties/id
+ARG BETTER_AUTH_URL=https://umitsengul.online
+ARG NEXT_PUBLIC_BASE_PATH=/carsties
 
 ENV NEXT_PUBLIC_BASE_API=$NEXT_PUBLIC_BASE_API \
     NEXT_PUBLIC_ID_URL=$NEXT_PUBLIC_ID_URL \
-    BETTER_AUTH_URL=$BETTER_AUTH_URL
+    BETTER_AUTH_URL=$BETTER_AUTH_URL \
+    NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry

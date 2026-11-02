@@ -7,13 +7,16 @@ type Props = {
     callbackUrl?: string;
 }
 
-export default function LoginButton({ callbackUrl = '/' }: Props) {
+// better-auth callbackURL'i baseURL'e gore cozumler; basePath'i elle eklemek gerekir.
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+
+export default function LoginButton({ callbackUrl = `${basePath}/` }: Props) {
     return (
         <Button
             variant='outline'
             size='lg'
-            onClick={() => authClient.signIn.oauth2({
-                providerId: 'duende',
+            onClick={() => authClient.signIn.social({
+                provider: 'duende',
                 callbackURL: callbackUrl
             })}
         >

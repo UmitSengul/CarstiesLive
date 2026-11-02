@@ -25,10 +25,19 @@ better-auth, @microsoft/signalr, @base-ui/react, react-hook-form, date-fns, moti
 
 ## Auth flow
 
-- `src/lib/auth.ts` configures `betterAuth` with a `genericOAuth` plugin pointed at IdentityService's `/connect/authorize`, `/connect/token`, `/connect/userinfo` (client id `nextApp`, PKCE, scopes `openid profile auctionApp`)
-- `src/app/api/auth/[...all]/route.ts` — better-auth's catch-all route handler (sign-in redirect, OAuth callback, session endpoints)
-- `src/proxy.ts` — middleware that gates `/session` behind a valid session cookie, redirecting to `/auth/sign-in` otherwise
-- `src/lib/fetch-wrapper.ts` — server-side fetch helper that attaches a bearer token (via `auth.api.getAccessToken({ providerId: "duende" })`) to every API call, and normalizes responses into `{ ok, data }` / `{ ok: false, status, error }`
+- `src/lib/auth.ts` configures `betterAuth` with a `genericOAuth` plugin pointed at IdentityService's `/connect/authorize`, `/connect/token`, `/connect/userinfo` (client id `nextApp`, PKCE, scopes `openid profile auctionApp`). better-auth 1.7: no `issuer` field (explicit endpoints), sign-in runs through the standard `signIn.social({ provider: "duende" })` flow
+- `src/app/api/auth/[...all]/route.ts` — better-auth's catch-all route handler. Next.js strips `basePath` from `req.url` before invoking the handler, so the request path is re-prefixed with `NEXT_PUBLIC_BASE_PATH` (`/carsties/api/auth/...`) to match better-auth's `basePath`
+- `src/proxy.ts` — middleware that gates `/session` behind a valid session cookie, redirecting to `/auth/sign-in` otherwise (paths built with the `basePath` prefix)
+- `src/lib/fetch-wrapper.ts` — server-side fetch helper that attaches a bearer token to every API call: `auth.api.listUserAccounts()` → find the `duende` account → `auth.api.getAccessToken({ accountId })` (better-auth 1.7 signature), then normalizes responses into `{ ok, data }` / `{ ok: false, status, error }`
+
+## Deployment (path-based single domain)
+
+Production serves the app under `https://umitsengul.online/carsties` instead of a dedicated subdomain:
+
+- `next.config.ts` sets `basePath` from `NEXT_PUBLIC_BASE_PATH` (empty locally → `http://localhost:3000/`, `/carsties` in prod)
+- better-auth uses `baseURL=BETTER_AUTH_URL` (origin only, e.g. `https://umitsengul.online`) + `basePath=${NEXT_PUBLIC_BASE_PATH}/api/auth`; the OAuth callback therefore becomes `/carsties/api/auth/callback/duende`
+- `/carsties/api/auth/*` must be routed to the Next.js app, not to the gateway (`deploy/nginx/edge.conf` places that `location` above `/carsties/api/`)
+- `NEXT_PUBLIC_*` values are baked at build time (`frontend/web-app/Dockerfile` args, filled by CI)
 
 ## Pages / Routes
 

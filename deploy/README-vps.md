@@ -1,237 +1,150 @@
-# Carsties — VPS (Rabisu / VPS-ALMA) Operasyon Notları
+# Carsties — VPS Operasyon Notları
 
 Sunucu: `VPS-ALMA` · AlmaLinux 9.8 · 2 vCPU / 3.5 GiB RAM + 4 GiB swap · 40 GB disk
 IP: `185.93.70.199` · WireGuard: `10.200.0.1` · Repo dizini: `/opt/carsties`
-Domainler: `app.` (Next.js), `api.` (gateway), `id.` (Duende IdentityServer) → `umitsengul.online`
 
-> ⚠️ Kampüs ağından bu IP'ye **TCP 22 ara ara sessizce düşüyor** (ICMP de dalgalı).
-> Aynı anda sunucu ayakta ve 80/443 çalışıyor → **SSH için WireGuard yolunu kullan**:
-> `ssh vps` / `ssh vps-wg` (10.200.0.1). Public yol yedek: `ssh vps-public`.
+> ⚠️ Kampüs ağından bu IP'ye **TCP 22 ara ara sessizce düşüyor**. SSH için WireGuard yolunu kullan:
+> `ssh vps` / `ssh vps-wg` (10.200.0.1). GitHub Actions runner'ları buluttan bağlandığı için
+> public yol (`185.93.70.199:22`) kullanılır.
 
-## Özet — bu kurulumda ne yapıldı
+## 1) URL şeması (tek alan adı, path bazlı)
 
-- `app.` / `api.` / `id.umitsengul.online` üzerinden **HTTPS ile çalışan tam yığın**;
-  11 konteyner `restart: unless-stopped`, dışarıya yalnız **22/80/443** açık
-  (web-app yalnız `127.0.0.1:3000`).
-- Repo'da **4 dosya değişti** → Identity + Gateway'e `ForwardedHeaders`, web-app
-  Dockerfile'ına build-time `NEXT_PUBLIC_*` arg'ları, Register sayfasında hata raporlaması.
-  Ayrıca **`deploy/` klasörü eklendi** (prod override, `certs.sh`, `.env.example`, bu dosya).
-- TLS: **acme-companion kullanılmıyor** (nginx-proxy 1.11 + `forego` SIGHUP sorunu) →
-  `deploy/certs.sh` (certbot webroot) + günlük `carsties-certs.timer`.
-- VPS'te ek olarak: nabız (`carsties-heartbeat`) timer'ı, kalıcı journal,
-  sertifika yenileme timer'ı, sırların tutulduğu `/opt/carsties/deploy/.env` (chmod 600).
-- Düzeltilen hata: Register başarısız olsa da "Successfully registered!" gösteriyordu
-  (parola politikası hataları yutuluyordu) → artık hata mesajları ekranda.
-- Dosya dosya tüm döküm: **§7**.
+| Dış URL | Arkadaki servis | nginx davranışı |
+|---|---|---|
+| `https://umitsengul.online/` | statik landing (`deploy/landing`) | dosya |
+| `https://umitsengul.online/carsties/…` | `web-app:3000` | önek korunur (`basePath=/carsties`) |
+| `https://umitsengul.online/carsties/api/auth/…` | `web-app:3000` | better-auth callback |
+| `https://umitsengul.online/carsties/api/…` | `gateway-svc:80` | önek **silinir** (`/auctions`, `/notifications`) |
+| `https://umitsengul.online/carsties/id/…` | `identity-svc:80` | önek korunur (`PathBase=/carsties/id`) |
 
-## 1) Deploy / güncelleme
-```bash
-# laptop -> VPS  (node_modules/.next/.git hariç ~10 MB)
-rsync -az --delete \
-  --exclude node_modules --exclude .next --exclude .git \
-  --exclude 'src/*/bin' --exclude 'src/*/obj' --exclude .env.local \
-  -e "ssh -o ConnectTimeout=10" /Yazilim/Carsties/ vps:/opt/carsties/
-
-# VPS'te
-cd /opt/carsties
-COMPOSE_PARALLEL_LIMIT=2 docker compose --env-file deploy/.env \
-  -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
-```
-`COMPOSE_PARALLEL_LIMIT=2` → 3.5 GiB RAM'de build sırasında OOM olmaması için.
-İlk tam build ~25 dk (imaj indirme + 7 .NET restore/build + Next.js build).
-
-> Arka planda başlatacaksan **tek** komut çalıştır (çift `compose up` aynı isimde
-> konteyner çakışması verir):
-> `setsid nohup docker compose ... > /tmp/carsties-up.log 2>&1 < /dev/null &`
+Issuer: `https://umitsengul.online/carsties/id` · Client redirect URI:
+`https://umitsengul.online/carsties/api/auth/callback/duende` (better-auth 1.7 callback yolu).
 
 ## 2) Konteynerler
+
 | servis | imaj | dış port |
 |---|---|---|
-| `nginx-proxy` (container_name sabit) | `nginxproxy/nginx-proxy` | **80, 443** |
-| `carsties-web-app-1` | `trycatchlearn/web-app` | `127.0.0.1:3000` |
-| `carsties-gateway-svc-1` | `trycatchlearn/gateway-svc` | - |
-| `carsties-identity-svc-1` | `trycatchlearn/identity-svc` | - |
-| `carsties-auction-svc-1` / `bid` / `search` / `notify` | `trycatchlearn/*` | - |
+| `nginx-proxy` (edge, `container_name` sabit) | `nginx:alpine` + `deploy/nginx/edge.conf` | **80, 443** |
+| `carsties-web-app-1` | `ghcr.io/umitsengul/carstieslive-web-app` | `127.0.0.1:3000` |
+| `carsties-gateway-svc-1` | `ghcr.io/umitsengul/carstieslive-gateway-svc` | - |
+| `carsties-identity-svc-1` | `ghcr.io/umitsengul/carstieslive-identity-svc` | - |
+| `carsties-auction-svc-1` / `bid` / `search` / `notify` | `ghcr.io/umitsengul/carstieslive-*` | - |
 | `carsties-postgres-1`, `rabbitmq`, `meilisearch` | upstream | - |
 
-Postgres/RabbitMQ/Meilisearch şifreleri `deploy/.env`'den gelir (connection string'ler
-prod override'ta buna göre yeniden yazılır). Meili `MEILI_ENV=production` + 48 hex key.
+`nginx-proxy` artık docker-gen kullanmıyor: tek alan adı için **statik** yapılandırma
+(`deploy/nginx/edge.conf`) mount edilir. `VIRTUAL_HOST` / `LETSENCRYPT_HOST` değişkenleri prod'da kullanılmaz.
 
-## 3) TLS / sertifikalar (acme-companion YOK)
-`nginx-proxy` 1.11 imajında PID 1 `forego`; **SIGHUP'ı kapanış sinyali sayıyor** ve
-konteyner `Exited (0)` oluyor. acme-companion sertifika kurulumundan sonra proxy'ye
-SIGHUP gönderdiği için bu ikili burada çalışmıyor. Onun yerine:
+## 3) Deploy (GitHub Actions)
 
+Akış: `main`'e push → **quality** (build + NuGet/npm audit + lint + next build) →
+**build-and-push** (7 imaj, GHCR) → **deploy** (SSH → `deploy/deploy.sh`).
+
+`deploy/deploy.sh` ne yapar:
+1. `git fetch` + `git reset --hard origin/main` (`deploy/.env` izlenmediği için korunur)
+2. `IMAGE_TAG=sha-<kısa commit>` (imaj etiketi)
+3. `docker compose pull` + `up -d --remove-orphans` (build yok)
+4. `docker exec nginx-proxy nginx -t && nginx -s reload`
+5. smoke test: `https://<DOMAIN>/` ve `https://<DOMAIN>/carsties/`
+
+Gerekli GitHub **secrets**: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_USER`, `GHCR_PAT`
+(`GHCR_PAT`: `read:packages` yetkili klasik PAT).
+
+Elle deploy:
 ```bash
-./deploy/certs.sh issue    # ilk sertifika: app+api+id (tek SAN sertifikasi, certbot webroot)
-./deploy/certs.sh renew    # yenileme (gunde 1 kez systemd timer)
+ssh vps 'cd /opt/carsties && ./deploy/deploy.sh'
+# belirli sürüme sabitlemek / geri almak icin:
+ssh vps 'cd /opt/carsties && IMAGE_TAG=sha-<eski-sha> ./deploy/deploy.sh'
 ```
-Akış: `certbot/certbot` → `carsties_letsencrypt` volume → PEM'ler
-`carsties_nginx-certs` volume'una `<host>.crt` / `<host>.key` olarak yazılır →
-geçici bir konteyner ağa bağlanıp ayrılır (connect/disconnect olayı) → nginx-proxy
-içindeki docker-gen config'i yeniden üretir ve `nginx -s reload` yapar.
-Gerekirse script `nginx-proxy`'yi yeniden başlatır (fallback).
 
-Yenileme timer'ı: `systemctl list-timers carsties-certs.timer`
-(dosyalar: `/etc/systemd/system/carsties-certs.{service,timer}`).
-Test modu: `deploy/.env` içinde `LETSENCRYPT_TEST=true` (staging CA).
+## 4) TLS / sertifikalar
 
-## 4) Doğrulama
+`acme-companion` kullanılmıyor; sertifikalar `deploy/certs.sh` (certbot HTTP-01 / webroot) ile alınır,
+`carsties_nginx-certs` volume'una `<host>.crt/.key` olarak yazılır ve edge nginx reload edilir.
+Günlük yenileme: `carsties-certs.timer`.
+
 ```bash
-curl -sI https://api.umitsengul.online/auctions
-curl -s  https://id.umitsengul.online/.well-known/openid-configuration | python3 -m json.tool | head -5
-curl -s  https://id.umitsengul.online/.well-known/openid-configuration | grep -o 'https://id[^"]*'
+./deploy/certs.sh bootstrap # ilk kurulum: edge acilabilsin diye gecici self-signed sertifika
+./deploy/certs.sh issue     # gercek sertifika (yalniz DOMAIN)
+./deploy/certs.sh renew     # yenileme
+./deploy/certs.sh dry-run   # staging testi (limit yakmaz)
+```
+
+Sertifika hattı (lineage) adı `carsties-prod` (eski `carsties` sertifikası `app/api/id` SAN'larını
+taşıdığı için yenisi ayrı isimle alınır; dosyalar yine `<DOMAIN>.crt/.key` olarak yazılır).
+
+Not: HTTP-01 için 80 geçici olarak firewalld'de açılır, iş bitince kapatılır.
+
+## 5) İlk kurulum / geçiş kontrol listesi (VPS)
+
+```bash
+# 0) Yedek
+cp /opt/carsties/deploy/.env /root/carsties.env.bak
+
+# 1) deploy/.env'i tek domain semasina gore guncelle (sirlar ayni kalir)
+#    DOMAIN=umitsengul.online  +  IMAGE_TAG=latest
+#    (APP_HOST/API_HOST/ID_HOST satirlarini kaldir)
+
+# 2) Depoyu git klonuna cevir (CI bundan sonra git ile gunceller)
+mv /opt/carsties /opt/carsties.rsync-bak
+# read-only deploy key (GitHub > Settings > Deploy keys) ile:
+git clone git@github.com:UmitSengul/CarstiesLive.git /opt/carsties
+cp /root/carsties.env.bak /opt/carsties/deploy/.env && chmod 600 /opt/carsties/deploy/.env
+
+# 3) GHCR login (bir kez)
+echo "<PAT>" | docker login ghcr.io -u UmitSengul --password-stdin
+
+# 4) Sertifika + deploy sirasi (edge sertifikasiz acilamaz, certbot da edge'e ihtiyac duyar)
+cd /opt/carsties
+./deploy/certs.sh bootstrap   # gecici self-signed sertifika (edge acilabilsin)
+./deploy/deploy.sh            # stack + edge ayaga kalkar (80/443)
+./deploy/certs.sh issue       # gercek Let's Encrypt sertifikasi + nginx reload
+./deploy/deploy.sh            # smoke test dogrulamasi icin tekrar calistirilabilir
+```
+
+> Eski `app./api./id.umitsengul.online` vhost'ları kaldırılır; DNS kayıtları silinmese de edge
+> yalnız `umitsengul.online` için `server_name` tanımladığı için 404/503 döner.
+
+## 6) Doğrulama
+
+```bash
+curl -sI https://umitsengul.online/ | head -3                                  # 200 (landing)
+curl -sI https://umitsengul.online/carsties/ | head -3                        # 200
+curl -sI https://umitsengul.online/carsties/api/auctions | head -3            # 405/200
+curl -s  https://umitsengul.online/carsties/id/.well-known/openid-configuration \
+  | grep -o 'https://umitsengul.online/carsties/id[^"]*' | head               # issuer + endpoint'ler
 ssh vps 'cd /opt/carsties && docker compose --env-file deploy/.env -f docker-compose.yml -f deploy/docker-compose.prod.yml ps'
 ssh vps 'docker exec nginx-proxy nginx -T | grep -c ssl_certificate'
 ```
-Login sayfası: `https://app.umitsengul.online/auth/sign-in` · seed kullanıcılar:
-`alice` / `Pass123$`, `bob` / `Pass123$`. (ClientAppUrl = `https://app.umitsengul.online`,
-redirect = `/api/auth/oauth2/callback/duende`.)
 
-`X-Forwarded-Proto/For` → `UseForwardedHeaders()` (Identity + Gateway) sayesinde
-discovery endpoint'leri `https://` üretir; aksi halde login POST'ları 301 ile GET'e düşer.
+Tarayıcı akışı: `/carsties/` → `Login` → `https://umitsengul.online/carsties/id/Account/Login` →
+`/carsties/api/auth/callback/duende` → `/carsties/session` → SignalR `wss://umitsengul.online/carsties/api/notifications`.
 
-## 5) Nabız / "VPS askıya alınıyor mu?" takibi
-```bash
-ssh vps 'tail -5 /var/log/carsties-heartbeat.log'
-ssh vps '/usr/local/bin/carsties-heartbeat-gaps.sh'
-ssh vps 'journalctl --list-boots | tail -5; last -x shutdown | head -5'
-```
-Yorumlama: boşluk + **aynı boot_id** → hypervisor dondurmuş (suspend);
-boşluk + **yeni boot_id** + `shutdown` kaydı → düzgün reboot; kayıt yok → sert power-off.
-Nabız: `carsties-heartbeat.timer`, 30 sn'de bir `https://1.1.1.1/cdn-cgi/trace` çağırır.
-
-## 6) Bilinen durumlar / notlar
-- firewalld `public` zone: http/https/ssh + 51820/udp açık. Dışarıya yalnız 22/80/443.
-- SELinux disabled; Docker 29.9.2 + Compose 5.6.1 (`!reset` / `!override` destekli).
-- `docker compose config` ile birleşik yapı doğrulanabilir:
-  `docker compose --env-file deploy/.env -f docker-compose.yml -f deploy/docker-compose.prod.yml config`.
-- Duende IdentityServer 8 lisans uyarısı normaldir (ticari kullanımda lisans gerekir).
-- Build sırasında `BETTER_AUTH_SECRET` uyarısı çıkar (better-auth build-time kontrolü);
-  runtime'da değer `deploy/.env`'den verilir, işlevsel etkisi yoktur.
-- `NU1903` (System.Security.Cryptography.Pkcs 9.0.0) transitive paket uyarısı → upstream.
-
-## 7) Değişiklik dökümü (detay)
-
-Bu kurulum için yapılan tüm değişiklikler. Üç kırılım var: **repo**, **VPS**, **laptop/host**.
-Hiçbiri henüz commit edilmedi (`git status` → 4 modified + `deploy/` untracked).
-
-### 7.1 Repo'da değişen dosyalar
-
-| dosya | fark | ne / neden |
-|---|---|---|
-| `src/IdentityService/HostingExtensions.cs` | +15 | `ForwardedHeaders` kaydı + `app.UseForwardedHeaders()` |
-| `src/GatewayService/Program.cs` | +11 | aynı yapılandırma (CORS ve proxy'den önce) |
-| `frontend/web-app/Dockerfile` | +10 | `NEXT_PUBLIC_*` / `BETTER_AUTH_URL` build arg'ları |
-| `src/IdentityService/Pages/Account/Register/Index.cshtml.cs` | +18 −3 | Identity hatalarını ekrana bas (bug fix) |
-
-#### Identity + Gateway — `ForwardedHeaders`
-```csharp
-_ = builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownNetworks.Clear();   // trafik yalnız iç docker ağından geliyor
-    options.KnownProxies.Clear();
-});
-// ...
-_ = app.UseForwardedHeaders();       // routing / auth'tan ÖNCE
-```
-**Neden:** TLS nginx-proxy'de sonlandığı için, bu başlıklar olmadan discovery dokümanı
-`http://id.umitsengul.online/connect/token` üretiyordu → login POST'u 301 ile GET'e düşüyordu.
-
-#### web-app `Dockerfile`
-```dockerfile
-ARG NEXT_PUBLIC_BASE_API=https://api.umitsengul.online
-ARG NEXT_PUBLIC_ID_URL=https://id.umitsengul.online
-ARG BETTER_AUTH_URL=https://app.umitsengul.online
-
-ENV NEXT_PUBLIC_BASE_API=$NEXT_PUBLIC_BASE_API \
-    NEXT_PUBLIC_ID_URL=$NEXT_PUBLIC_ID_URL \
-    BETTER_AUTH_URL=$BETTER_AUTH_URL
-```
-`NEXT_PUBLIC_*` değerleri **build zamanında** bundle'a gömülür; değerler prod override'taki
-`build.args` ile verilir. (Değişmezse tarayıcı `localhost:5001`'e gitmeye çalışır.)
-
-#### Register sayfası (bug fix)
-```csharp
-// ÖNCE: hatalar yutuluyor, başarısız kayıtta bile sayfa "Successfully registered!" diyordu
-if (result.Succeeded) { await userManager.AddClaimsAsync(...); }
-RegisterSuccess = true;
-
-// SONRA
-if (!result.Succeeded)
-{
-    foreach (var error in result.Errors)
-    {
-        ModelState.AddModelError(string.Empty, error.Description);
-    }
-
-    RegisterSuccess = false;
-
-    return Page();
-}
-
-await userManager.AddClaimsAsync(user, [new Claim(JwtClaimTypes.Name, Input.FullName!)]);
-RegisterSuccess = true;
-```
-**Belirti:** kayıt "başarılı" görünüyor, DB'de kullanıcı yok → login'de
-`User Login Failure / "invalid credentials"`.
-**Kök neden:** ASP.NET Identity varsayılan parola politikası (≥6 karakter, büyük + küçük harf,
-rakam, alfanümerik olmayan karakter) ve `result.Errors`'ın `ModelState`'e eklenmemesi.
-
-### 7.2 Yeni `deploy/` dosyaları
-
-- **`docker-compose.prod.yml`** (162 satır) — base `docker-compose.yml`'e dokunulmadı, tüm prod
-  farkları bu override'da: `ports: !reset []` (iç servisler dışa kapalı; sadece `nginx-proxy`
-  80/443 + web-app `127.0.0.1:3000`), `VIRTUAL_HOST`/`VIRTUAL_PORT`, `restart: unless-stopped`,
-  `json-file` log rotasyonu (10m × 3), sırların `${...}` ile `deploy/.env`'den verilmesi,
-  connection string'lerin buna göre yeniden yazılması, `MEILI_ENV=production`,
-  `search-svc`'nin `auction-svc`'ye bağımlılığı. `acme-companion` bilinçli olarak yok (§3).
-- **`certs.sh`** — certbot (webroot) → `carsties_letsencrypt` volume → PEM'ler
-  `carsties_nginx-certs` volume'una `<host>.crt/.key` → docker-gen `nginx -s reload`.
-  Komutlar: `issue` / `renew`; `nginx-proxy` restart fallback'i içerir.
-- **`.env.example`** — 10 anahtar: `APP_HOST`, `API_HOST`, `ID_HOST`, `ACME_EMAIL`,
-  `LETSENCRYPT_TEST`, `BETTER_AUTH_SECRET`, `POSTGRES_PASSWORD`, `RABBITMQ_USER`,
-  `RABBITMQ_PASS`, `MEILI_MASTER_KEY`.
-- **`README-vps.md`** — bu dosya.
-
-Git'e girmeyen yerel dosya: `frontend/web-app/.env.local` (`.gitignore` içindeki `.env*` kuralı).
-
-### 7.3 VPS'te oluşturulan / değişen dosyalar
+## 7) Bu kurulumda değişen dosyalar
 
 | yol | ne |
 |---|---|
-| `/opt/carsties/` | repo senkronu (`git`, `rsync` paketleri kuruldu) |
-| `/opt/carsties/deploy/.env` | 10 sır, chmod 600 — **git'te yok** |
-| `/usr/local/bin/carsties-heartbeat.sh` | 30 sn'de bir `https://1.1.1.1/cdn-cgi/trace` → `/var/log/carsties-heartbeat.log` |
-| `/usr/local/bin/carsties-heartbeat-gaps.sh` | log'daki boşlukları raporlar (suspend analizi) |
-| `/etc/systemd/system/carsties-heartbeat.{service,timer}` | `enabled` |
-| `/etc/systemd/system/carsties-certs.{service,timer}` | `enabled`, günlük sertifika yenileme |
-| `/etc/logrotate.d/carsties-heartbeat` | log rotasyonu |
-| `/var/log/journal` | kalıcı journal açıldı |
-| `/etc/letsencrypt` + `carsties_nginx-certs` volume | `app`/`api`/`id` SAN sertifikası |
-| `identity` DB | test kullanıcısı **`umit` / `Test1234!`** |
+| `docker-compose.yml` | imajlar `ghcr.io/umitsengul/carstieslive-*:${IMAGE_TAG:-latest}` + `build:` (lokal) |
+| `deploy/docker-compose.prod.yml` | statik edge nginx, `pull_policy: always`, tek domain env'leri, `PathBase` |
+| `deploy/nginx/edge.conf` | path bazlı yönlendirme + TLS + WebSocket + HSTS |
+| `deploy/landing/index.html` | kök alan adı karşılama sayfası (Carsties linki) |
+| `deploy/certs.sh` | tek domain (`DOMAIN`) + `nginx -s reload` |
+| `deploy/deploy.sh` | VPS deploy betiği (git reset → pull → up → reload → smoke) |
+| `deploy/.env.example` | `DOMAIN`, `IMAGE_TAG`, sırlar |
+| `.github/workflows/pipeline.yml` | CI/CD (quality → GHCR push → SSH deploy) |
+| `.github/dependabot.yml` | npm / nuget / docker / actions güncellemeleri |
+| `frontend/web-app/next.config.ts` | `basePath` (`NEXT_PUBLIC_BASE_PATH`) |
+| `frontend/web-app/src/lib/auth*.ts`, `proxy.ts`, `fetch-wrapper.ts` | better-auth 1.7 + basePath uyumu |
+| `frontend/web-app/src/app/api/auth/[...all]/route.ts` | Next'in sildiği `basePath` önekini isteğe geri ekler |
+| `frontend/web-app/Dockerfile` | yeni build arg'lar (`NEXT_PUBLIC_BASE_PATH` dahil) |
+| `frontend/web-app/.dockerignore` | build context küçültme |
+| `src/IdentityService/HostingExtensions.cs` | `UsePathBase(PathBase)` |
+| `src/IdentityService/Config.cs` | redirect URI → `/api/auth/callback/duende` |
+| `src/IdentityService/IdentityService.csproj` | `Microsoft.EntityFrameworkCore.Tools` 10.0.14 (Pkcs açığı) |
 
-### 7.4 Laptop / host tarafı
+## 8) Sırlar / notlar
 
-| yol | değişiklik |
-|---|---|
-| `~/.docker/desktop/settings-store.json` | `FilesharingDirectories: ["/home", "/Yazilim"]` → `docker build` NU1301 hatası çözüldü |
-| `~/.ssh/config` | `laptop`, `vps` (10.200.0.1), `vps-wg`, `vps-public`, `laptop-vpn`, `github.com` alias'ları |
-| `/etc/nftables.conf` | kalıcı değişiklik yok (denenip geri alındı) |
-| `/etc/hosts` | `127.0.0.1 app/api/id.umitsengul.online` geçici eklendi, sonra kaldırıldı |
-
-### 7.5 Değişmeyenler
-
-- Base `docker-compose.yml` hiç değişmedi — tüm prod farkları `deploy/` override'ında.
-- `.NET` iş mantığı / endpoint'ler değişmedi (yalnız proxy header'ları + register hata raporlaması).
-- Frontend iş mantığı değişmedi (yalnız Dockerfile build arg'ları).
-
-### 7.6 Commit'e hazırlık
-
-```bash
-git add deploy src/GatewayService/Program.cs src/IdentityService/HostingExtensions.cs \
-        src/IdentityService/Pages/Account/Register/Index.cshtml.cs frontend/web-app/Dockerfile
-# .env dosyaları gitignore'da; commit'e girmez
-```
-
+- `deploy/.env` git'te **yok** (`.gitignore`), chmod 600, yalnız VPS'te tutulur.
+- `NEXT_PUBLIC_*` değerleri **build zamanında** imaja gömülür → CI'da doğru URL'lerle build edilir.
+- Yerel dosya `frontend/web-app/.env.local` (gitignore) lokal geliştirme içindir.
+- Eski sürüme dönüş: `IMAGE_TAG=sha-<eski>` ile `deploy.sh` ya da `git reset --hard <eski-commit>`.
+- `carsties-heartbeat.timer` ve `carsties-certs.timer` systemd birimleri değişmedi.
