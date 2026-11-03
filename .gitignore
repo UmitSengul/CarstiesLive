@@ -5,6 +5,8 @@
 
 # dotenv files
 .env
+# deploy/release.sh tarafindan uretilir (yalnizca build arg'lari; git'e girmez)
+deploy/.env.build
 
 # User-specific files
 *.rsuser

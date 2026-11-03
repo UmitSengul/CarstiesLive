@@ -1,0 +1,29 @@
+# ============================================================
+# Carsties - "registry'siz" (yerel imaj) modu
+#
+# Kullanim (VPS'te /opt/carsties icinde, imajlar `docker load` ile yuklendikten sonra):
+#   IMAGE_SOURCE=local IMAGE_TAG=sha-<kisa> ./deploy/deploy.sh
+#
+# Amac:
+#   deploy/docker-compose.prod.yml icindeki `pull_policy: always` degeri, her
+#   `up -d` oncesi imaji registriden cekmeye calisir. Imajlar dev makinede build
+#   edilip SSH ile tasindiginda bu davranis deploy'u kirar (imaj GHCR'de yok).
+#   Bu dosya yalnizca uygulama imajlari icin pull'u kapatir; postgres/rabbitmq/
+#   meilisearch/nginx gibi upstream imajlar varsayilan davranista kalir.
+# ============================================================
+
+services:
+  auction-svc:
+    pull_policy: never
+  bid-svc:
+    pull_policy: never
+  search-svc:
+    pull_policy: never
+  notify-svc:
+    pull_policy: never
+  identity-svc:
+    pull_policy: never
+  gateway-svc:
+    pull_policy: never
+  web-app:
+    pull_policy: never

@@ -4,8 +4,7 @@ Sunucu: `VPS-ALMA` · AlmaLinux 9.8 · 2 vCPU / 3.5 GiB RAM + 4 GiB swap · 40 G
 IP: `185.93.70.199` · WireGuard: `10.200.0.1` · Repo dizini: `/opt/carsties`
 
 > ⚠️ Kampüs ağından bu IP'ye **TCP 22 ara ara sessizce düşüyor**. SSH için WireGuard yolunu kullan:
-> `ssh vps` / `ssh vps-wg` (10.200.0.1). GitHub Actions runner'ları buluttan bağlandığı için
-> public yol (`185.93.70.199:22`) kullanılır.
+> `ssh vps` / `ssh vps-wg` (10.200.0.1). `deploy/release.sh` bu alias'ı kullanır (`--host` ile değiştirilebilir).
 
 ## 1) URL şeması (tek alan adı, path bazlı)
 
@@ -34,32 +33,60 @@ Issuer: `https://umitsengul.online/carsties/id` · Client redirect URI:
 `nginx-proxy` artık docker-gen kullanmıyor: tek alan adı için **statik** yapılandırma
 (`deploy/nginx/conf.d/default.conf`) mount edilir. `VIRTUAL_HOST` / `LETSENCRYPT_HOST` değişkenleri prod'da kullanılmaz.
 
-## 3) Deploy (GitHub Actions)
+## 3) Deploy (GitHub Actions **yok** — yerel build + SSH)
 
-Akış: `path-migration` (ve `main`) dalına push → **quality** (build + NuGet/npm audit + lint +
-next build + basePath doğrulaması) → **build-and-push** (7 imaj, GHCR) → **deploy**
-(SSH → `deploy/deploy.sh`, `DEPLOY_BRANCH=<push edilen dal>`).
+Akış (GitHub yalnızca **private repo** olarak kullanılır; Actions'ta hiçbir şey çalışmaz):
 
-> Not: Bu repoda `main` dalı **başka bir hatta** (kurs spec'leri / CourseAssets); Carsties
-> kodu `path-migration` dalında yaşıyor. Bu yüzden workflow iki dalı da tetikler ve VPS'teki
-> klonu push edilen dala eşitler.
-
-`deploy/deploy.sh` ne yapar:
-1. `git fetch` + `git reset --hard origin/<DEPLOY_BRANCH>` (`deploy/.env` izlenmediği için korunur)
-2. `IMAGE_TAG=sha-<kısa commit>` (imaj etiketi)
-3. `docker compose pull` + `up -d --remove-orphans` (build yok)
-4. `docker exec nginx-proxy nginx -t && nginx -s reload`
-5. smoke test: `https://<DOMAIN>/` ve `https://<DOMAIN>/carsties/`
-
-Gerekli GitHub **secrets**: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_USER`, `GHCR_PAT`
-(`GHCR_PAT`: `read:packages` yetkili klasik PAT).
-
-Elle deploy:
 ```bash
-ssh vps 'cd /opt/carsties && DEPLOY_BRANCH=path-migration ./deploy/deploy.sh'
-# belirli sürüme sabitlemek / geri almak icin:
-ssh vps 'cd /opt/carsties && IMAGE_TAG=sha-<eski-sha> ./deploy/deploy.sh'
+./deploy/quality.sh    # 1) kalite kapısı: .NET build + NuGet audit, npm audit/lint/build + basePath
+./deploy/release.sh    # 2) dev makinesinde build -> imajları SSH ile taşı -> VPS'te deploy
 ```
+
+`deploy/release.sh` ne yapar (dev makinesinde):
+1. Ön kontrol: docker, `ssh <host>`, aktif dal `path-migration` mı, çalışma dizini temiz mi
+   (kirliyse durur: VPS yalnız `origin/<dal>` içeriğini alır), push edilmemiş commit'ler otomatik push edilir
+2. `IMAGE_TAG=sha-<kısa commit>` · prod build-arg'larıyla **yerel** `docker compose build`
+   (`deploy/.env.build` geçici olarak üretilir; gerçek sırlar build'e girmez)
+3. `docker save | zstd/gzip | ssh <host> 'docker load'` (registry yok, GHCR push yok, PAT gerekmez)
+4. VPS'te `IMAGE_SOURCE=local IMAGE_TAG=<tag> ./deploy/deploy.sh`
+
+`deploy/deploy.sh` ne yapar (VPS):
+1. `git fetch` + `git reset --hard origin/<DEPLOY_BRANCH>` (`SKIP_GIT=1` ile atlanır)
+2. `IMAGE_SOURCE=local` ise: imajların varlığını doğrular, `pull_policy` kapatılır
+   (`deploy/docker-compose.local-images.yml`) ve **pull yapılmaz**
+3. `up -d --remove-orphans`
+4. `docker exec nginx-proxy nginx -t && nginx -s reload`
+5. smoke test: `https://<DOMAIN>/` ve `https://<DOMAIN>/carsties/` + disk uyarısı
+
+> **Neden VPS'te build yok?** VPS 2 vCPU / 3.5 GiB RAM ve canlı yığın zaten ~1.5 GiB kullanıyor;
+> .NET SDK + Next.js build aynı makinede OOM/gecikme riski. Dev makinesi 16 vCPU / 29 GiB.
+
+Sık kullanılan komutlar:
+```bash
+./deploy/release.sh --only web-app                    # tek servis (en hızlı yol)
+./deploy/release.sh --only identity-svc,gateway-svc   # birkaç servis
+./deploy/release.sh --no-build --tag sha-abc1234      # imaj zaten var, yalnız taşı+deploy
+./deploy/release.sh --host vps-wg -y                  # WireGuard yolu, onaysız
+./deploy/release.sh --help
+```
+
+Kısmi release (`--only`): taşınmayan servisler VPS'te bir önceki imajla `docker tag` edilir,
+yalnızca hedef servis yeniden oluşturulur.
+
+Elle / geri alma:
+```bash
+# VPS'te yalnız deploy (imajlar zaten yüklüyse):
+ssh vps 'cd /opt/carsties && IMAGE_SOURCE=local IMAGE_TAG=sha-<kisa> ./deploy/deploy.sh'
+# önceki sürüme dön (imaj VPS'te duruyorsa):
+ssh vps 'cd /opt/carsties && IMAGE_SOURCE=local IMAGE_TAG=sha-<eski> SKIP_GIT=1 ./deploy/deploy.sh'
+# VPS'teki imaj envanteri / disk:
+ssh vps 'docker image ls | grep carstieslive; df -h /var/lib/docker'
+```
+
+> Eski registry akışı hâlâ mümkün: `deploy/release.sh` yerine GHCR'ye push edip
+> `IMAGE_SOURCE=registry ./deploy/deploy.sh` (varsayılan mod) çalıştırılabilir.
+> GitHub'da kalan tek şey: elle tetiklenen `quality (manuel)` workflow'u (opsiyonel).
+
 
 ## 4) TLS / sertifikalar
 
@@ -133,9 +160,12 @@ Tarayıcı akışı: `/carsties/` → `Login` → `https://umitsengul.online/car
 | `deploy/nginx/conf.d/default.conf` | path bazlı yönlendirme + TLS + WebSocket + HSTS |
 | `deploy/landing/index.html` | kök alan adı karşılama sayfası (Carsties linki) |
 | `deploy/certs.sh` | tek domain (`DOMAIN`) + `nginx -s reload` |
-| `deploy/deploy.sh` | VPS deploy betiği (git reset → pull → up → reload → smoke) |
+| `deploy/deploy.sh` | VPS deploy betiği: git reset → imaj doğrulama → up → reload → smoke (`IMAGE_SOURCE=registry\|local`, `SKIP_GIT=1`) |
+| `deploy/release.sh` | **Dev makinesinde** release: ön kontrol → yerel build → `docker save \| ssh \| docker load` → VPS deploy |
+| `deploy/quality.sh` | Kalite kapısı (eski CI `quality` job'unun yerel hâli) |
+| `deploy/docker-compose.local-images.yml` | Yerel imaj modu: `pull_policy: never` (registry'siz deploy) |
 | `deploy/.env.example` | `DOMAIN`, `IMAGE_TAG`, sırlar |
-| `.github/workflows/pipeline.yml` | CI/CD (quality → GHCR push → SSH deploy) |
+| `.github/workflows/pipeline.yml` | yalnız **manuel** kalite workflow'u (push/PR'da çalışmaz, GHCR push yok, deploy yok) |
 | `.github/dependabot.yml` | npm / nuget / docker / actions güncellemeleri |
 | `frontend/web-app/next.config.ts` | `basePath` (`NEXT_PUBLIC_BASE_PATH`) |
 | `frontend/web-app/src/lib/auth*.ts`, `proxy.ts`, `fetch-wrapper.ts` | better-auth 1.7 + basePath uyumu |
@@ -149,7 +179,9 @@ Tarayıcı akışı: `/carsties/` → `Login` → `https://umitsengul.online/car
 ## 8) Sırlar / notlar
 
 - `deploy/.env` git'te **yok** (`.gitignore`), chmod 600, yalnız VPS'te tutulur.
-- `NEXT_PUBLIC_*` değerleri **build zamanında** imaja gömülür → CI'da doğru URL'lerle build edilir.
+- `NEXT_PUBLIC_*` değerleri **build zamanında** imaja gömülür → `deploy/release.sh` prod URL'leriyle build eder.
+- `deploy/.env.build` `release.sh` tarafından üretilir (gitignore): yalnız build arg'ları; gerçek sırlar girmez.
 - Yerel dosya `frontend/web-app/.env.local` (gitignore) lokal geliştirme içindir.
-- Eski sürüme dönüş: `IMAGE_TAG=sha-<eski>` ile `deploy.sh` ya da `git reset --hard <eski-commit>`.
+- Eski sürüme dönüş: `IMAGE_TAG=sha-<eski>` + `IMAGE_SOURCE=local` ile `deploy.sh` ya da `git reset --hard <eski-commit>`.
+- VPS'te imaj birikimi: her release ~2 GB bırakır. Temizlik: `docker image prune -a --filter 'until=168h'`.
 - `carsties-heartbeat.timer` ve `carsties-certs.timer` systemd birimleri değişmedi.
