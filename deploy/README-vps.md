@@ -86,6 +86,13 @@ ssh vps 'docker image ls | grep carstieslive; df -h /var/lib/docker'
 > Eski registry akışı hâlâ mümkün: `deploy/release.sh` yerine GHCR'ye push edip
 > `IMAGE_SOURCE=registry ./deploy/deploy.sh` (varsayılan mod) çalıştırılabilir.
 > GitHub'da kalan tek şey: elle tetiklenen `quality (manuel)` workflow'u (opsiyonel).
+>
+> **Geçmiş (02.11–03.11.2026):** Deploy bu tarihe kadar GitHub Actions ile yapılıyordu
+> (quality → GHCR'ye 7 imaj push → `appleboy/ssh-action` ile VPS'te `deploy.sh`; gerekli
+> secret'lar `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_USER`, `GHCR_PAT`). `deploy` job'ı
+> secret'lar tanımlanmadığı için hiç yeşile dönmedi ve tüm zincir GitHub'a bağımlıydı; bu yüzden
+> bırakıldı. Eski/yeni akış karşılaştırması ve gerekçeler: [`../README.md`](../README.md#yayın-production)
+> ("Önceki akış" bölümü).
 
 
 ## 4) TLS / sertifikalar

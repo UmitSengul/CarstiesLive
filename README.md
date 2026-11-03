@@ -58,6 +58,8 @@ Test hesapları: `alice` / `Pass123$` · `bob` / `Pass123$`.
 
 ## Yayın (production)
 
+### Şu anki akış — GitHub Actions **yok** (03.11.2026'dan itibaren)
+
 CI/CD **GitHub Actions'a bağlı değildir**; yalnızca kaynak kod private repo'da durur.
 Release, geliştirici makinesinde çalışır ve imajlar SSH ile VPS'e taşınır (registry/PAT yok):
 
@@ -80,6 +82,55 @@ ssh vps 'cd /opt/carsties && IMAGE_SOURCE=local IMAGE_TAG=sha-<kisa> ./deploy/de
 ssh vps 'cd /opt/carsties && IMAGE_SOURCE=local IMAGE_TAG=sha-<eski-sha> SKIP_GIT=1 ./deploy/deploy.sh'
 ```
 
+### Önceki akış — GitHub Actions + GHCR (02.11.2026 – 03.11.2026, artık kullanılmıyor)
+
+Bu tarihe kadar deploy, `.github/workflows/pipeline.yml` içindeki 3 aşamalı GitHub Actions
+pipeline'ı ile yapılıyordu:
+
+| Aşama | Nerede | Ne yapıyordu |
+|---|---|---|
+| `quality` | GitHub runner | `dotnet restore/build` + NuGet zafiyet kapısı, `npm ci`, `npm audit --omit=dev`, `npm run lint`, prod `basePath` ile `next build`, `jq` ile `routes-manifest.json` doğrulaması |
+| `build-and-push` | GitHub runner (matrix, 7 iş) | Her servis için `ghcr.io/umitsengul/carstieslive-<servis>` imajını build edip GHCR'ye **push** (`latest` + `sha-<7>`, `type=gha` cache) |
+| `deploy` | GitHub runner → SSH | `appleboy/ssh-action` ile VPS'e bağlanıp `deploy/deploy.sh` çalıştırıyordu (`DEPLOY_BRANCH=<push edilen dal>`) |
+
+Akış: `path-migration`/`main` dalına **push** → quality → GHCR'ye 7 imaj → VPS'te
+`docker compose pull && up -d` (sunucuda build yok, `pull_policy: always`).
+
+Gereken GitHub **secrets**: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (private key), `GHCR_USER`,
+`GHCR_PAT` (`read:packages`). İmajlar GHCR'de public paket olarak duruyordu.
+
+**Neden bırakıldı (03.11.2026):**
+- `deploy` job'ı secret'lar tanımlanmadığı için hiç yeşile dönmedi → her push'ta kırmızı pipeline;
+  deploy pratikte elle yapılıyordu, yani pipeline "yarım" çalışıyordu.
+- Deploy'un tamamı GitHub'a bağımlıydı: imaj build kuyruğu, GHCR push/pull, PAT yönetimi,
+  runner → VPS SSH. GitHub tarafında yaşanan kesinti/kota/secret sorunları doğrudan yayını etkiliyordu.
+- İmaj başına ~400 MB'ı GHCR'ye push edip oradan çekmek, tek sunuculuk bu kurulum için gereğinden
+  fazla hareketli parça (registry + kimlik doğrulama + paket görünürlüğü) getiriyordu.
+- Dev makinesi 16 vCPU / 29 GiB; VPS 2 vCPU / 3.5 GiB. Build'i bu kadar güçlü bir makinede yapıp
+  sonucu doğrudan taşımak daha hızlı (ölçüldü: 400 MB imaj → ~18 s transfer) ve GitHub'a bağımsız.
+
+**Bugün GitHub'da kalan:** private repo + (isteğe bağlı, elle tetiklenen) `quality (manuel)`
+workflow'u + `dependabot.yml`. Push/PR olaylarında **hiçbir şey çalışmaz**.
+
+**Eski model hâlâ mümkün:** `IMAGE_SOURCE=registry` modu korundu. İmajları herhangi bir yolla
+(GHCR, self-hosted registry, `docker push`) bir registry'ye koyup
+`ssh vps 'cd /opt/carsties && IMAGE_SOURCE=registry IMAGE_TAG=<tag> ./deploy/deploy.sh'`
+ile eski "pull" davranışına dönebilirsin.
+
+### Karşılaştırma
+
+| | Eski (GitHub Actions + GHCR) | Yeni (yerel release + SSH) |
+|---|---|---|
+| Tetikleme | GitHub'a push | `./deploy/release.sh` (yerelde) |
+| Build yeri | GitHub runner (7 paralel iş) | Dev makinesi (16 vCPU) |
+| İmaj dağıtımı | GHCR push → VPS pull | `docker save \| zstd \| ssh \| docker load` |
+| GitHub bağımlılığı | Workflow + secret + PAT + paket izni | **Yok** (yalnız kod barındırma) |
+| Kalite kapısı | `quality` job | `./deploy/quality.sh` (aynı adımlar) |
+| Deploy süresi | ~6–9 dk (queue + build + push + pull) | ~1–2 dk (cache'li build + transfer) |
+| Gereken sırlar | 5 GitHub secret + PAT | Sadece SSH anahtarı (deploy key) |
+| Rollback | `IMAGE_TAG=sha-<eski>` + pull | `IMAGE_TAG=sha-<eski>` + `IMAGE_SOURCE=local`, imaj VPS'te durur |
+| Ölçeklenebilirlik | Birden fazla sunucu/ortam için uygun | Tek sunucu için ideal (çoklu ortamda registry eklenmeli) |
+
 Ayrıntılar: [`deploy/README-vps.md`](deploy/README-vps.md)
 
 ## Yol haritası
@@ -92,7 +143,8 @@ izleme/yedekleme, güvenlik sertleştirmeleri…): [`ROADMAP.md`](ROADMAP.md)
 ```
 src/                 .NET servisleri (Identity, Gateway, Auction, Bid, Search, Notification, Contracts)
 frontend/web-app/    Next.js uygulaması
-deploy/              prod compose override, edge nginx, landing, certs.sh, deploy.sh, .env.example
+deploy/              prod compose override, edge nginx, landing, certs.sh, .env.example
+                     deploy.sh (VPS deploy) · release.sh (yerel build+transfer) · quality.sh (kalite kapısı)
 specs/               servis bazlı teknik dokümanlar
 ROADMAP.md           yapılanlar + yapılacaklar (önceliklendirilmiş backlog)
 ```
