@@ -1,3 +1,8 @@
+# Dependabot: bağımlılık PR'ları (isteğe bağlı GitHub özelliği).
+# NOT: CI/CD artık GitHub Actions'a bağlı değil (bkz. deploy/release.sh); bu PR'lar
+# otomatik test/deploy TETİKLEMEZ. Yerelde doğrulama: ./deploy/quality.sh
+# Tamamen kapatmak istersen bu dosyayı sil (GitHub > Settings > Code security'de
+# Dependabot kapalı kalır).
 version: 2
 updates:
   - package-ecosystem: npm

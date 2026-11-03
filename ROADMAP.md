@@ -21,8 +21,8 @@ tarih + kısa not düşün.
 | better-auth callback | `https://umitsengul.online/carsties/api/auth/callback/duende` |
 | TLS | Let's Encrypt (HTTP-01 / webroot), geçerlilik **31.01.2027** · otomatik yenileme: `carsties-certs.timer` |
 | Edge | `nginx:1.29-alpine` (statik config, `deploy/nginx/conf.d/`) — HSTS + WebSocket upgrade |
-| İmajlar | `ghcr.io/umitsengul/carstieslive-*:{latest,sha-<commit>}` (public) |
-| CI/CD | GitHub Actions: quality → 7 imaj build/push → SSH deploy (`path-migration`) |
+| İmajlar | `ghcr.io/umitsengul/carstieslive-*:sha-<commit>` — **yerelde build**, VPS'e `docker save \| ssh \| docker load` ile taşınır (registry'den çekilmez) |
+| CI/CD | **GitHub Actions yok**: `./deploy/quality.sh` (kapı) → `./deploy/release.sh` (build + taşı + deploy). GitHub yalnız private repo |
 | Sunucu | AlmaLinux 9.8 · 2 vCPU / 3.5 GiB RAM + 4 GiB swap · `/opt/carsties` (git klonu) |
 
 ---
@@ -67,14 +67,17 @@ Eski yapı `app.` / `api.` / `id.umitsengul.online` alt alan adlarıydı; tek al
 - [x] Doğrulandı: `npm audit --omit=dev` → **0 vulnerabilities**; `dotnet package list --vulnerable --include-transitive` → **temiz**.
 - [x] CI'da kapılar: `npm audit --omit=dev --audit-level=high` ve NuGet vulnerability gate (JSON + `jq`).
 
-### 2.4 CI/CD — GHCR + GitHub Actions
+### 2.4 CI/CD — yerel release + SSH (GitHub Actions yok)
 
-- [x] `.github/workflows/pipeline.yml`: **quality** (dotnet restore/build, NuGet gate, npm ci, npm audit, lint, `next build` prod `basePath` ile, `jq` ile basePath doğrulaması) → **build-and-push** (7 imaj, matrix, `latest` + `sha-<7>` etiketleri, gha cache) → **deploy** (SSH → `deploy/deploy.sh`, `DEPLOY_BRANCH=<push edilen dal>`).
-- [x] `.github/dependabot.yml`: npm / nuget / docker / github-actions (haftalık, minor+patch gruplu).
-- [x] `deploy/deploy.sh`: `git fetch` + `reset --hard` → imaj çek (build yok) → `up -d` → edge `nginx -t` + reload → smoke test (uyarı bazlı, `SMOKE_STRICT=1` katı) → `IMAGE_TAG` ile rollback desteği.
-- [x] `main` dalının farklı bir hatta (kurs spec'leri) olduğu tespit edildi → Carsties kodu **`path-migration`** dalında; workflow iki dalı da dinliyor, deploy edilen dal commit'in dalı.
+- [x] ~~`.github/workflows/pipeline.yml` (quality → GHCR push → SSH deploy)~~ **kaldırıldı** (03.11.2026): GHCR push ve deploy job'ları silindi; dosya yalnız **elle tetiklenen** `quality (manuel)` workflow'una indirildi (push/PR'da hiçbir şey çalışmaz).
+- [x] `deploy/quality.sh`: eski CI `quality` job'unun yerel hâli — `dotnet restore/build` + NuGet gate, `npm audit --omit=dev`, `npm run lint`, prod `basePath` ile `next build`, `routes-manifest.json` doğrulaması.
+- [x] `deploy/release.sh`: **dev makinesinde** build → `docker save | zstd/gzip | ssh | docker load` → VPS'te `deploy.sh`. `--only <servis>`, `--tag`, `--no-build`, `--host` seçenekleri; kirli ağaçta durur, push edilmemiş commit'i otomatik push eder.
+- [x] `deploy/deploy.sh`: `IMAGE_SOURCE=registry|local` (local'de pull yok, `docker-compose.local-images.yml` ile `pull_policy: never`), `SKIP_GIT=1`, kısmi release'te eksik servisi önceki imajla `docker tag` eder, `git reset` sonrası kendini yeniden başlatır (bash eski inode'u okuma tuzağı).
+- [x] Inter fontu repoya gömüldü (`next/font/local`, `src/app/fonts/InterVariable.woff2`): build'de `fonts.googleapis.com` bağımlılığı yok, Türkçe karakterler dahil.
+- [x] Doğrulandı (03.11.2026): `deploy/release.sh --only web-app` uçtan uca başarılı → `IMAGE_TAG=sha-9f983a3`, 7 servis yeniden oluştu, smoke uyarısız, font yerelden `200 font/woff2`.
+- [x] `.github/dependabot.yml`: duruyor (PR üretir, workflow tetiklemez) — istenirse silinebilir.
+- [x] `main` dalının farklı bir hatta (kurs spec'leri) olduğu tespit edildi → Carsties kodu **`path-migration`** dalında.
 - [x] VPS'te `/opt/carsties` rsync kopyasından **git klonuna** çevrildi (deploy key + `deploy/.env` korunarak; yedek: `/opt/carsties.rsync-bak-20261102-2302`).
-- [x] Doğrulandı: `web-app:sha-f4ee239` GHCR'de mevcut (web-app build'i düzeltildikten sonra).
 
 ### 2.5 VPS operasyonu & TLS
 
@@ -149,8 +152,8 @@ Efor: S (≤ yarım gün) · M (1–2 gün) · L (3+ gün).
 
 ### 3.4 CI/CD ve operasyon (P1)
 
-- [ ] **GitHub secrets** — `VPS_HOST=185.93.70.199`, `VPS_USER=root`, `VPS_SSH_KEY` (`~/.ssh/vps_ed25519` private içeriği), `GHCR_USER`, `GHCR_PAT`. Secrets yokken her push'ta **deploy job'ı fail** olur. · `S`
-- [ ] **Deploy job'ı doğrula** — secrets sonrası ilk push ile `deploy` adımını yeşile çevir; `sha-*` imajının VPS'e indiğini kontrol et. · `S`
+- [x] ~~**GitHub secrets** (`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_USER`, `GHCR_PAT`)~~ **gerekmiyor**: deploy `deploy/release.sh` ile dev makinesinden yapılıyor (GHCR push yok, PAT yok).
+- [x] ~~**Deploy job'ı doğrula**~~ **gerekmiyor**: GitHub'da deploy job'ı kalmadı; uçtan uca akış `deploy/release.sh` ile doğrulandı.
 - [ ] **Staging ortamı** — ayrı compose/env (staging path veya subdomain), merge öncesi otomatik deploy. · `L`
 - [ ] **Trivy + SBOM** — imaj taraması (CRITICAL/HIGH gate), `sbom: true`, (opsiyonel) cosign imzası. · `M`
 - [ ] **Branch protection** — `path-migration` için required checks (quality), PR şablonu, CODEOWNERS. · `S`
@@ -159,7 +162,7 @@ Efor: S (≤ yarım gün) · M (1–2 gün) · L (3+ gün).
 - [ ] **İzleme & alarm** — uptime (healthchecks.io/Uptime Kuma), disk %80, RAM/swap, restart sayacı; Telegram/e-posta bildirimi. · `M`
 - [ ] **Log yönetimi** — `json-file` rotasyonu var (10m×3); merkezi toplama (Loki/Grafana Cloud). · `M`
 - [ ] **Sertifika hijyeni** — `systemctl list-timers` ile `carsties-certs.timer` doğrula, eski `carsties` lineage'ini temizle, periyodik `renew --dry-run`. · `S`
-- [ ] **Rollback tatbikatı** — `IMAGE_TAG=sha-<eski>` ile geri dönüşü yazılı prosedüre bağla, bir kez prova et. · `S`
+- [ ] **Rollback tatbikatı** — `ssh vps 'cd /opt/carsties && IMAGE_SOURCE=local IMAGE_TAG=sha-<eski> SKIP_GIT=1 ./deploy/deploy.sh'` prosedürünü bir kez prova et. · `S`
 - [ ] **Sunucu sertleştirme** — SSH key-only + `fail2ban`, root login kapalı (CI için ayrı deploy kullanıcısı), `docker system prune` cron, swap/overcommit (3.5 GiB RAM). · `M`
 - [ ] **(Opsiyonel) CI → WireGuard** — 22 portunu internetten kapatıp deploy'u WireGuard üzerinden yapmak. · `M`
 
@@ -167,7 +170,7 @@ Efor: S (≤ yarım gün) · M (1–2 gün) · L (3+ gün).
 
 - [ ] `specs/web-app.md` ve `specs/identity-service.md`'yi yeni URL şeması / `PathBase` / callback yolu ile gözden geçir (kısmen güncellendi).
 - [ ] README'ye **Mermaid** mimari diyagramı (edge → web-app/gateway/identity → servisler).
-- [ ] **ADR**'ler: (1) neden path tabanlı tek domain, (2) neden statik edge nginx (acme-companion yerine), (3) neden GHCR + pull modeli (VPS'te build yok).
+- [x] **ADR**'ler: (1) neden path tabanlı tek domain, (2) neden statik edge nginx (acme-companion yerine), (3) neden registry'siz yerel build + `docker save|ssh|load` (VPS'te build yok — kapasite).
 - [ ] Runbook: sertifika yenileme, rollback, DB restore, incident müdahalesi.
 - [ ] API dokümanı (`/openapi`) hazır olduğunda README'ye link.
 

@@ -58,18 +58,26 @@ Test hesapları: `alice` / `Pass123$` · `bob` / `Pass123$`.
 
 ## Yayın (production)
 
-İmajlar GitHub Actions ile build edilip **GHCR**'ye (`ghcr.io/umitsengul/carstieslive-*`) push edilir,
-VPS yalnızca `docker compose pull && up -d` yapar (sunucuda build yok).
-
-Carsties kodu **`path-migration`** dalında yaşar (`main` bu repoda başka bir hatta — kurs
-spec'leri). CI/CD iki dalı da dinler ve VPS'teki klonu push edilen dala eşitler.
+CI/CD **GitHub Actions'a bağlı değildir**; yalnızca kaynak kod private repo'da durur.
+Release, geliştirici makinesinde çalışır ve imajlar SSH ile VPS'e taşınır (registry/PAT yok):
 
 ```bash
-# VPS'te elle deploy / güncelleme
-cd /opt/carsties && DEPLOY_BRANCH=path-migration ./deploy/deploy.sh
+./deploy/quality.sh                    # kalite kapısı (dotnet build + NuGet/npm audit + lint + next build)
+./deploy/release.sh                     # yerel build -> docker save | ssh | docker load -> VPS deploy
+./deploy/release.sh --only web-app      # tek servis (en hızlı yol)
+```
+
+VPS yalnızca `up -d` yapar (sunucuda build yok: 2 vCPU / 2 GB RAM canlı yığını barındırıyor).
+
+Carsties kodu **`path-migration`** dalında yaşar (`main` bu repoda başka bir hatta — kurs
+spec'leri). `deploy/release.sh` VPS'teki klonu bu dala eşitler.
+
+```bash
+# VPS'te elle deploy / güncelleme (imajlar zaten yüklüyse)
+ssh vps 'cd /opt/carsties && IMAGE_SOURCE=local IMAGE_TAG=sha-<kisa> ./deploy/deploy.sh'
 
 # geri alma (imaj etiketi ile)
-cd /opt/carsties && IMAGE_TAG=sha-<eski-sha> ./deploy/deploy.sh
+ssh vps 'cd /opt/carsties && IMAGE_SOURCE=local IMAGE_TAG=sha-<eski-sha> SKIP_GIT=1 ./deploy/deploy.sh'
 ```
 
 Ayrıntılar: [`deploy/README-vps.md`](deploy/README-vps.md)
