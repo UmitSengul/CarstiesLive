@@ -172,6 +172,7 @@ Tarayıcı akışı: `/carsties/` → `Login` → `https://umitsengul.online/car
 | `frontend/web-app/src/app/api/auth/[...all]/route.ts` | Next'in sildiği `basePath` önekini isteğe geri ekler |
 | `frontend/web-app/Dockerfile` | yeni build arg'lar (`NEXT_PUBLIC_BASE_PATH` dahil) |
 | `frontend/web-app/.dockerignore` | build context küçültme |
+| `frontend/web-app/src/app/fonts/InterVariable.woff2` + `layout.tsx` | `next/font/google` → `next/font/local`: font repoda, build'de ağ bağımlılığı yok |
 | `src/IdentityService/HostingExtensions.cs` | `UsePathBase(PathBase)` |
 | `src/IdentityService/Config.cs` | redirect URI → `/api/auth/callback/duende` |
 | `src/IdentityService/IdentityService.csproj` | `Microsoft.EntityFrameworkCore.Tools` 10.0.14 (Pkcs açığı) |

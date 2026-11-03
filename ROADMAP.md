@@ -301,6 +301,7 @@ cd ../.. && dotnet build Carsties.sln && dotnet package list --vulnerable --incl
 | 02.11.2026 | Tek domain + path tabanlı yayına geçiş; statik edge nginx + landing sayfası; Identity `PathBase`; better-auth 1.7 migrasyonu; bağımlılık güvenlik yükseltmeleri (runtime 0 açık); GHCR + GitHub Actions CI/CD; Let's Encrypt sertifikası; yayında bulunan 7 hata düzeltildi. |
 | 02.11.2026 | Repo + GHCR public yapıldı → **maruz kalma değerlendirmesi** eklendi (§6). Sır sızıntısı yok; 5 risk tespit edildi, kapatma adımları **onay bekliyor** (bilinçli olarak uygulanmadı). |
 | 02.11.2026 | **Responsive düzeltmeleri** (12 dosya): kart ızgarası, görsel ölçekleme, kart rozetleri, detay sayfası kolonları, header/arama/filtreler, pagination, form ızgaraları, sign-in/empty/error kartları. `npm run lint` 0 error, `npm run build` başarılı. |
+| 03.11.2026 | **GitHub Actions bağımlılığı kaldırıldı**: `deploy/release.sh` (yerel build → `docker save \| ssh \| docker load` → VPS deploy, registry/GHCR/PAT yok), `deploy/quality.sh` (kalite kapısı), `IMAGE_SOURCE=local` desteği + `docker-compose.local-images.yml`, workflow yalnız manuel kaliteye indirildi. Inter fontu repoya gömüldü (`next/font/local`) — build'de Google Fonts'a ağ bağımlılığı kalmadı. |
 
 
 

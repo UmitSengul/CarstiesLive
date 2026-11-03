@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+// Font repoda gomulu (self-hosted): `next/font/google` build sirasinda
+// fonts.googleapis.com'a erisim ister; kapali/AGS'li ortamlarda build kirilir.
+// InterVariable.woff2 = Inter degisken fontu (OFL), Latin + Latin-Ext (Turkce) dahil.
+import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import NavBar from "@/components/nav/NavBar";
@@ -7,7 +10,13 @@ import {Toaster} from "@/components/ui/toast";
 import SignalRProvider from "@/contexts/SignalRContext";
 import LiveNotifications from "@/contexts/LiveNotifications";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+const inter = localFont({
+  src: "./fonts/InterVariable.woff2",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
+  variable: "--font-sans",
+});
 
 export const dynamic = 'force-dynamic';
 
