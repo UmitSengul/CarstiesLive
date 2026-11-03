@@ -43,9 +43,21 @@ log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*"; }
 if [[ "${SKIP_GIT}" == "1" ]]; then
   log "Git esitleme atlandi (SKIP_GIT=1)"
 else
+  SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+  SUM_BEFORE="$(sha1sum "${SCRIPT_PATH}" | cut -d' ' -f1)"
+
   log "Depo guncelleniyor (origin/${BRANCH})"
   git fetch --all --prune
   git reset --hard "origin/${BRANCH}"
+
+  # Betik dosyasi git reset ile degistiyse, calisan surec hala ESKI icerigi okur
+  # (bash dosyayi fd ile acmis tutar). Bu durumda yeni surumle yeniden baslat;
+  # aksi halde deploy eski mantikla devam eder (orn. pull_policy/pull davranisi).
+  if [[ -z "${DEPLOY_REEXEC:-}" && "$(sha1sum "${SCRIPT_PATH}" | cut -d' ' -f1)" != "${SUM_BEFORE}" ]]; then
+    log "deploy.sh guncellendi -> yeni surumle yeniden calisiyor"
+    exec env DEPLOY_REEXEC=1 SKIP_GIT=1 IMAGE_SOURCE="${IMAGE_SOURCE}" \
+      IMAGE_TAG="${REQUESTED_IMAGE_TAG:-}" DEPLOY_BRANCH="${BRANCH}" "${SCRIPT_PATH}" "$@"
+  fi
 fi
 
 SHA="$(git rev-parse --short=7 HEAD)"

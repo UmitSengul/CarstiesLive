@@ -157,9 +157,13 @@ docker save "${IMAGES[@]}" | "${COMPRESS[@]}" \
   | ssh -o BatchMode=yes "${HOST}" "${DECOMPRESS} -d | docker load"
 
 # ---------------------------------------------------------------- 4) VPS'te deploy
-log "VPS deploy (deploy/deploy.sh, IMAGE_SOURCE=local)"
+# NOT: git esitleme BURADA yapilir (deploy.sh icinde degil): deploy.sh'in kendisi
+# guncellenmisse, git reset sonrasi calisan surec hala ESKI dosyayi okur (bash fd).
+# Bu yuzden once esitliyoruz, sonra guncel betigi SKIP_GIT=1 ile cagiriyoruz.
+log "VPS deploy (git esitle + deploy/deploy.sh, IMAGE_SOURCE=local)"
 ssh -o BatchMode=yes -o ServerAliveInterval=15 "${HOST}" \
-  "cd '${REMOTE_DIR}' && IMAGE_SOURCE=local IMAGE_TAG='${TAG}' DEPLOY_BRANCH='${BRANCH}' ./deploy/deploy.sh"
+  "set -e; cd '${REMOTE_DIR}'; git fetch --all --prune; git reset --hard 'origin/${BRANCH}'; \
+   IMAGE_SOURCE=local IMAGE_TAG='${TAG}' SKIP_GIT=1 DEPLOY_BRANCH='${BRANCH}' ./deploy/deploy.sh"
 
 # ---------------------------------------------------------------- 5) ozet
 log "Release tamam"
