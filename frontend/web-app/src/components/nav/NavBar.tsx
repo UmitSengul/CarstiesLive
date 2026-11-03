@@ -11,10 +11,10 @@ export default async function NavBar() {
     const user = await getCurrentUser();
 
     return (
-        <header className='sticky top-0 z-50 p-3 bg-background items-center shadow-lg flex justify-between'>
-            <Link href='/' className='flex items-center gap-2 text-3xl font-semibold text-red-500'>
-                <CarFront size={50}/>
-                <div>Carsties Auctions</div>
+        <header className='sticky top-0 z-50 flex flex-wrap items-center justify-between gap-2 bg-background p-3 shadow-lg'>
+            <Link href='/' className='flex items-center gap-2 text-xl font-semibold text-red-500 sm:text-3xl'>
+                <CarFront className='h-8 w-8 shrink-0 sm:h-[50px] sm:w-[50px]'/>
+                <div className='hidden md:block'>Carsties Auctions</div>
             </Link>
             <Suspense>
                 <SearchInput/>

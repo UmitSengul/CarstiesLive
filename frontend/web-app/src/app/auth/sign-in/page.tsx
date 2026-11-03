@@ -11,7 +11,7 @@ export default async function SignInPage(props: PageProps<"/auth/sign-in">) {
     const callback = String(searchParams["callbackUrl"]) || `${basePath}/`;
     
     return (
-        <Card className='h-100 w-1/2 mx-auto my-auto flex flex-col gap-3 justify-center items-center text-center'>
+        <Card className='mx-auto my-auto flex w-full max-w-md flex-col items-center justify-center gap-3 p-6 text-center sm:p-8'>
             <Lock className='h-28 w-28' />
             <h2 className='text-2xl font-semibold'>You need to sign in to do that</h2>
             <p className='text-muted-foreground'>

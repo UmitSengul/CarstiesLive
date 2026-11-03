@@ -19,7 +19,7 @@ export default function EmptyState({
     const router = useRouter()
     
     return (
-        <Card className='h-[50vh] w-1/2 flex flex-col gap-3 justify-center items-center text-center'>
+        <Card className='flex w-full max-w-md flex-col items-center justify-center gap-3 p-8 text-center sm:p-10'>
             <CarFront className='h-28 w-28' />
             <h2 className='text-2xl font-semibold'>{title}</h2>
             <p className='text-muted-foreground'>{subtitle}</p>

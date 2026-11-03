@@ -64,7 +64,7 @@ export default function AuctionForm({auction}: Props) {
         <form onSubmit={handleSubmit(onSubmit)}>
             <FieldSet className='w-full'>
                 <FieldGroup>
-                    <div className='grid grid-cols-2 gap-4'>
+                    <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
                         <AppTextInput 
                             name='make'
                             label='Make of car'
@@ -81,7 +81,7 @@ export default function AuctionForm({auction}: Props) {
                         />
                     </div>
 
-                    <div className='grid grid-cols-2 gap-4'>
+                    <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
                         <AppTextInput
                             name='color'
                             label='Color of car'
@@ -99,7 +99,7 @@ export default function AuctionForm({auction}: Props) {
                         />
                     </div>
 
-                    <div className='grid grid-cols-2 gap-4'>
+                    <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
                         <AppTextInput
                             name='mileage'
                             label='How many miles on the clock'
@@ -122,7 +122,7 @@ export default function AuctionForm({auction}: Props) {
                         />
                     </div>
 
-                    <div className='grid grid-cols-2 gap-4'>
+                    <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
                         <AppTextInput
                             name='reservePrice'
                             label='Do you want a reserve price? Leave empty if no reserve'
@@ -155,7 +155,7 @@ export default function AuctionForm({auction}: Props) {
                     />
                 </FieldGroup>
             </FieldSet>
-            <div className='flex justify-end gap-3 mt-4'>
+            <div className='mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
                 <Button onClick={() => router.back()} variant='outline'>Cancel</Button>
                 <Button 
                     variant='default' 

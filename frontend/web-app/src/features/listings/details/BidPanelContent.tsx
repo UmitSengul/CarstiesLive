@@ -41,7 +41,7 @@ export default function BidPanelContent({bids, auction, isSeller, isSold,
     }, [auction.id, connection]);
     
     return (
-        <Card className='max-h-[80vh]'>
+        <Card className='max-h-none lg:max-h-[80vh]'>
             <CardHeader>
                 <CardTitle>Bid panel</CardTitle>
                 <CardDescription>Minimum next bid is{' '}

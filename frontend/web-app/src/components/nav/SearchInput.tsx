@@ -46,7 +46,7 @@ export default function SearchInput() {
     }
     
     return (
-        <InputGroup className='flex w-1/2 items-center bg-background rounded-full shadow-sm py-5'>
+        <InputGroup className='flex w-full items-center rounded-full bg-background py-5 shadow-sm sm:w-1/2 sm:max-w-md'>
             <InputGroupInput 
                 type='search'
                 placeholder='Search...'

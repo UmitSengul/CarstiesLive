@@ -14,28 +14,33 @@ type Props = {
 export default function AuctionCard({ auction }: Props) {
     return (
         <Link href={`/listings/${auction.id}`} 
-              className='transition-transform duration-200 hover:-translate-y-1'>
+              className='block min-w-0 transition-transform duration-200 hover:-translate-y-1'>
             <Card className='relative mx-auto w-full pt-0'>
-                <CarImage imageUrl={auction.imageUrl} />
-                <Badge className='absolute top-2 right-2' variant='secondary'>
-                    <User />
-                    {auction.seller}
-                </Badge>
-                <div className='absolute bottom-18 left-2'>
-                    <CountdownTimer auctionEnd={auction.auctionEnd} />
+                <div className='relative'>
+                    <CarImage imageUrl={auction.imageUrl} />
+                    {/* Rozet resmin uzerinde kalir ama kart genisligini asamaz */}
+                    <div className='absolute top-2 left-2 max-w-[calc(100%-1rem)]'>
+                        <CurrentHighBidBadge 
+                            reservePrice={auction.reservePrice} 
+                            amount={auction.currentHighBid}
+                            auctionId={auction.id}
+                        />
+                    </div>
                 </div>
-                <div className='absolute top-2 left-2'>
-                    <CurrentHighBidBadge 
-                        reservePrice={auction.reservePrice} 
-                        amount={auction.currentHighBid}
-                        auctionId={auction.id}
-                    />
-                </div>
-                <CardContent className='flex justify-between items-center'>
-                    <h3 className='text-muted-foreground'>
-                        {auction.make} {auction.model}
-                    </h3>
-                    <p className='font-semibold text-sm'>{auction.year}</p>
+                <CardContent className='flex flex-col gap-2'>
+                    <div className='flex items-center justify-between gap-2'>
+                        <h3 className='min-w-0 truncate text-muted-foreground'>
+                            {auction.make} {auction.model}
+                        </h3>
+                        <p className='shrink-0 text-sm font-semibold'>{auction.year}</p>
+                    </div>
+                    <div className='flex items-center justify-between gap-2'>
+                        <Badge className='min-w-0 max-w-[60%]' variant='secondary'>
+                            <User />
+                            <span className='min-w-0 truncate'>{auction.seller}</span>
+                        </Badge>
+                        <CountdownTimer auctionEnd={auction.auctionEnd} />
+                    </div>
                 </CardContent>
             </Card>
         </Link>

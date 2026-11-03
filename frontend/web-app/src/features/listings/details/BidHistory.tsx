@@ -36,7 +36,7 @@ export default function BidHistory({initialBids, auctionId}: Props) {
     
 
     return (
-        <div className='overflow-y-auto space-y-4 scrollbar-none max-h-[60vh]'>
+        <div className='overflow-y-auto space-y-4 scrollbar-none max-h-[40vh] lg:max-h-[60vh]'>
             {bids.length === 0 ? (
                 <p>There are no bids for this listing yet</p>
             ) : (

@@ -22,7 +22,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className='bg-muted min-h-screen flex flex-col'>
       <SignalRProvider>
           <NavBar />
-          <main className="container mx-auto mt-8 flex flex-1 flex-col">
+          {/* Yatay padding: `container` tek basina mobilde kenarlara yapistiriyor.
+              pb-24: AppPagination `fixed bottom-0` oldugu icin icerik altinda kalmasin. */}
+          <main className="mx-auto mb-24 mt-6 flex w-full max-w-7xl flex-1 flex-col px-4 sm:mt-8 sm:px-6 lg:px-8">
               {children}
           </main>
           <Toaster />

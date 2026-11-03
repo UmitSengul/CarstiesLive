@@ -104,10 +104,9 @@ Efor: S (≤ yarım gün) · M (1–2 gün) · L (3+ gün).
 
 ### 3.1 Frontend — UX / UI (P1)
 
-- [ ] **Responsive tasarım** — liste grid'i, listing detayı, form ve navigasyon mobil/tablet kırılımları. Şu an 49 `.tsx` dosyasının yalnız **8**'inde breakpoint var. · `M`
-  - `src/app/page.tsx`, `src/features/listings/**`, `src/components/nav/**`
-  - Grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`; `container` yerine `mx-auto w-full max-w-7xl px-4`
-  - Dokunma hedefleri ≥ 44px, yatay taşma testi (`overflow-x`), 360px genişlikte duman testi
+- [x] **Responsive tasarım** — liste grid'i, listing detayı, form ve navigasyon mobil/tablet kırılımları. Şu an 49 `.tsx` dosyasının yalnız **8**'inde breakpoint var. · `M`
+  - ✅ 02.11.2026: kart ızgarası `grid-cols-1 → sm:2 → lg:3 → xl:4`; `CarImage` `w-full h-auto` + `sizes`; kart rozetleri akışa alındı (`truncate`, `max-w-[calc(100%-1rem)]`); detay sayfası `lg:flex-row` + kolonlar `w-full lg:w-1/2`; meta kutuları `flex-wrap`; header `flex-wrap` + logo metni `md` altında gizli; arama `w-full sm:w-1/2`; filtreler mobilde ikon-only; pagination mobilde sadeleştirildi; `main` `px-4 sm:px-6 lg:px-8 pb-24`; sign-in/empty/error kartları `w-full max-w-md`; form alanları `grid-cols-1 sm:grid-cols-2`; bid panel yükseklikleri `lg` kırılımına bağlandı.
+  - Kalan: mobilde hamburger/drawer menü (aşağıdaki madde), 360px'te görsel tur.
 - [ ] **Koyu/açık tema seçici** — header'a `Sun/Moon` toggle. CSS altyapısı **hazır**: `src/app/globals.css` içinde `@custom-variant dark (&:is(.dark *))`, `:root` ve `.dark` değişken setleri mevcut; eksik olan `.dark` sınıfını yöneten katman. · `S`
   - `npm i next-themes` → `ThemeProvider` (`attribute="class"`, `defaultTheme="system"`, `enableSystem`, `disableTransitionOnChange`)
   - `src/app/layout.tsx`: `<html lang="tr" suppressHydrationWarning>` + provider sarmalama
@@ -301,6 +300,7 @@ cd ../.. && dotnet build Carsties.sln && dotnet package list --vulnerable --incl
 |---|---|
 | 02.11.2026 | Tek domain + path tabanlı yayına geçiş; statik edge nginx + landing sayfası; Identity `PathBase`; better-auth 1.7 migrasyonu; bağımlılık güvenlik yükseltmeleri (runtime 0 açık); GHCR + GitHub Actions CI/CD; Let's Encrypt sertifikası; yayında bulunan 7 hata düzeltildi. |
 | 02.11.2026 | Repo + GHCR public yapıldı → **maruz kalma değerlendirmesi** eklendi (§6). Sır sızıntısı yok; 5 risk tespit edildi, kapatma adımları **onay bekliyor** (bilinçli olarak uygulanmadı). |
+| 02.11.2026 | **Responsive düzeltmeleri** (12 dosya): kart ızgarası, görsel ölçekleme, kart rozetleri, detay sayfası kolonları, header/arama/filtreler, pagination, form ızgaraları, sign-in/empty/error kartları. `npm run lint` 0 error, `npm run build` başarılı. |
 
 
 

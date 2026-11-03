@@ -27,9 +27,9 @@ export default async function ListingDetailedPage(props: PageProps<"/listings/[i
     return (
         <AuctionStatusProvider>
             <div className='flex flex-col'>
-                <div className='flex justify-between'>
-                    <div className='flex items-center gap-3'>
-                        <h3 className='text-2xl font-semibold'>
+                <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+                    <div className='flex flex-wrap items-center gap-3'>
+                        <h3 className='text-xl font-semibold sm:text-2xl'>
                             {auction.make} {auction.model}
                         </h3>
                         {user?.username === auction.seller && (
@@ -47,17 +47,17 @@ export default async function ListingDetailedPage(props: PageProps<"/listings/[i
                     </div>
 
                     <div className='flex items-center gap-3'>
-                    <span className='text-muted-foreground uppercase'>
+                    <span className='text-sm uppercase text-muted-foreground sm:text-base'>
                         Time remaining
                     </span>
                         <CountdownTimer auctionEnd={auction.auctionEnd}/>
                     </div>
                 </div>
-                <div className='flex gap-6 mt-3'>
-                    <div className='flex w-1/2 flex-col'>
+                <div className='mt-3 flex flex-col gap-6 lg:flex-row'>
+                    <div className='flex w-full flex-col lg:w-1/2'>
                         <CarImage imageUrl={auction.imageUrl} thumbnail={false}/>
-                        <div className='flex flex-col gap-3 mt-3'>
-                            <div className='flex gap-3'>
+                        <div className='mt-3 flex flex-col gap-3'>
+                            <div className='flex flex-wrap gap-3'>
                                 <MetaCard label='Mileage' value={auction.mileage}/>
                                 <MetaCard label='Color' value={auction.color}/>
                                 <MetaCard label='Year' value={auction.year}/>
@@ -66,7 +66,7 @@ export default async function ListingDetailedPage(props: PageProps<"/listings/[i
                             <MetaCard label='Description' value={auction.description}/>
                         </div>
                     </div>
-                    <div className='flex flex-col w-1/2'>
+                    <div className='flex w-full flex-col lg:w-1/2'>
                         <BidPanel bids={bids} auction={auction} />
                     </div>
 

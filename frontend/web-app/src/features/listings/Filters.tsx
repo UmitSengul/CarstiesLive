@@ -40,36 +40,38 @@ export default function Filters() {
     }
     
     return (
-        <div className='flex justify-between items-center mb-4 -mt-4 p-3 border-b border-muted-foreground'>
-            <div className='text-2xl font-semibold'>
+        <div className='mb-4 -mt-4 flex flex-col gap-3 border-b border-muted-foreground p-3 md:flex-row md:items-center md:justify-between'>
+            <div className='text-xl font-semibold sm:text-2xl'>
                 All listings
             </div>
-            <div className='flex items-center gap-3'>
-                <span className='uppercase text-sm text-muted-foreground'>Filter by</span>
+            <div className='flex flex-wrap items-center gap-2 sm:gap-3'>
+                <span className='hidden text-sm uppercase text-muted-foreground md:inline'>Filter by</span>
                 <ButtonGroup>
                     {filterButtons.map(({label, icon: Icon, value}) => (
                         <Button 
                             key={value} 
                             variant={activeFilterBy === value ? 'default' : 'outline'}
                             onClick={() => setParams('filterBy', value)}
+                            aria-label={label}
                         >
                             <Icon />
-                            {label}
+                            <span className='hidden sm:inline'>{label}</span>
                         </Button>
                     ))}
                 </ButtonGroup>
             </div>
-            <div className='flex items-center gap-3'>
-                <span className='uppercase text-sm text-muted-foreground'>Order by</span>
+            <div className='flex flex-wrap items-center gap-2 sm:gap-3'>
+                <span className='hidden text-sm uppercase text-muted-foreground md:inline'>Order by</span>
                 <ButtonGroup>
                     {orderButtons.map(({label, icon: Icon, value}) => (
                         <Button
                             key={value}
                             variant={activeOrderBy === value ? 'default' : 'outline'}
                             onClick={() => setParams('orderBy', value)}
+                            aria-label={label}
                         >
                             <Icon />
-                            {label}
+                            <span className='hidden sm:inline'>{label}</span>
                         </Button>
                     ))}
                 </ButtonGroup>
