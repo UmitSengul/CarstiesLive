@@ -1,8 +1,8 @@
 using Contracts;
 using Microsoft.AspNetCore.SignalR;
-using NotificationService.Hubs;
+using Carsties.Notifications.Hubs;
 
-namespace NotificationService.Handlers;
+namespace Carsties.Notifications.Handlers;
 
 public class AuctionFinishedHandler(IHubContext<NotificationHub> hubContext)
 {

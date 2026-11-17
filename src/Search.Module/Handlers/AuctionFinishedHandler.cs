@@ -1,8 +1,8 @@
 using Contracts;
 using Meilisearch;
-using SearchService.Models;
+using Carsties.Search.Models;
 
-namespace SearchService.Handlers;
+namespace Carsties.Search.Handlers;
 
 public class AuctionFinishedHandler
 {

@@ -1,4 +1,4 @@
-using SearchService.Models;
+using Carsties.Search.Models;
 
 namespace SearchService.Tests;
 

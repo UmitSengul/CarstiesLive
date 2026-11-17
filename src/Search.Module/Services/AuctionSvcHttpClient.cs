@@ -1,7 +1,7 @@
 using Meilisearch;
-using SearchService.Models;
+using Carsties.Search.Models;
 
-namespace SearchService.Services;
+namespace Carsties.Search.Services;
 
 public class AuctionSvcHttpClient(HttpClient httpClient, IConfiguration config, 
     MeilisearchClient searchClient)

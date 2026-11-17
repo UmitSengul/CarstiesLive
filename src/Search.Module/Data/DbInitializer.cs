@@ -1,9 +1,9 @@
 using System.Text.Json;
 using Meilisearch;
-using SearchService.Models;
-using SearchService.Services;
+using Carsties.Search.Models;
+using Carsties.Search.Services;
 
-namespace SearchService.Data;
+namespace Carsties.Search.Data;
 
 public class DbInitializer
 {

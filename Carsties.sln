@@ -9,7 +9,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution items", "Solution 
 		docker-compose.yml = docker-compose.yml
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SearchService", "src\SearchService\SearchService.csproj", "{CDF9FFF6-D501-4BBD-A7DA-D0F51BF6067A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Search.Module", "src\Search.Module\Search.Module.csproj", "{CDF9FFF6-D501-4BBD-A7DA-D0F51BF6067A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Contracts", "src\Contracts\Contracts.csproj", "{6464C0C6-5242-4778-8173-2B4565DFF180}"
 EndProject
@@ -19,7 +19,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GatewayService", "src\Gatew
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bid.Module", "src\Bid.Module\Bid.Module.csproj", "{A2558A20-F521-49E6-90D2-2ABD83157F7D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationService", "src\NotificationService\NotificationService.csproj", "{D0711653-C372-425F-9105-36ED2322CA93}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Notification.Module", "src\Notification.Module\Notification.Module.csproj", "{D0711653-C372-425F-9105-36ED2322CA93}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{1137BC36-556E-4300-816E-1A9FC6E729CC}"
 EndProject

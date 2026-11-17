@@ -1,9 +1,9 @@
 using Mapster;
 using Meilisearch;
-using SearchService.Data;
-using SearchService.Endpoints;
-using SearchService.Handlers;
-using SearchService.Services;
+using Carsties.Search.Data;
+using Carsties.Search.Endpoints;
+using Carsties.Search.Handlers;
+using Carsties.Search.Services;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.RabbitMQ;

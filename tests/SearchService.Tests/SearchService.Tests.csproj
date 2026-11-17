@@ -21,7 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\SearchService\SearchService.csproj" />
+      <ProjectReference Include="..\..\src\Search.Module\Search.Module.csproj" />
     </ItemGroup>
 
 </Project>

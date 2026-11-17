@@ -1,9 +1,9 @@
 using Contracts;
 using Mapster;
 using Meilisearch;
-using SearchService.Models;
+using Carsties.Search.Models;
 
-namespace SearchService.Handlers;
+namespace Carsties.Search.Handlers;
 
 public class TransientSearchException(string message) : Exception(message);
 

@@ -1,7 +1,7 @@
 using System.Net;
 using Meilisearch;
 using Microsoft.Extensions.DependencyInjection;
-using SearchService.Models;
+using Carsties.Search.Models;
 
 namespace SearchService.Tests;
 

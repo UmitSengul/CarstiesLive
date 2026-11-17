@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 
-namespace NotificationService.Hubs;
+namespace Carsties.Notifications.Hubs;
 
 public class NotificationHub : Hub
 {

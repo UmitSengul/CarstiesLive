@@ -1,4 +1,4 @@
-namespace SearchService.Models;
+namespace Carsties.Search.Models;
 
 public class Item
 {

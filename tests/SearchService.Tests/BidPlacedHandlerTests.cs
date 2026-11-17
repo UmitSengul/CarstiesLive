@@ -1,7 +1,7 @@
 using Contracts;
 using Meilisearch;
 using Microsoft.Extensions.DependencyInjection;
-using SearchService.Models;
+using Carsties.Search.Models;
 using Wolverine.Tracking;
 
 namespace SearchService.Tests;

@@ -1,7 +1,7 @@
 using Contracts;
 using Meilisearch;
 
-namespace SearchService.Handlers;
+namespace Carsties.Search.Handlers;
 
 public class AuctionUpdatedHandler
 {

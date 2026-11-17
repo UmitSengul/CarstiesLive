@@ -1,4 +1,4 @@
-using NotificationService.Hubs;
+using Carsties.Notifications.Hubs;
 using Wolverine;
 using Wolverine.RabbitMQ;
 

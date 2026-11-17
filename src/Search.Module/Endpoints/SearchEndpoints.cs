@@ -1,7 +1,7 @@
 using Meilisearch;
-using SearchService.Models;
+using Carsties.Search.Models;
 
-namespace SearchService.Endpoints;
+namespace Carsties.Search.Endpoints;
 
 public static class SearchEndpoints
 {
