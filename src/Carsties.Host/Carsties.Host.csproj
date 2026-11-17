@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Carsties.Host</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    C0: bos iskelet. Modul projeleri C1'den itibaren buraya referans olarak eklenir.
+    Tek Kestrel, tek port (8080); MVC controller'lari C1'de korunarak tasinir.
+  -->
+
+</Project>
