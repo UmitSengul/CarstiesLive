@@ -1,7 +1,7 @@
-using System.Text.Json;
-using Meilisearch;
 using Carsties.Search.Models;
-using Carsties.Search.Services;
+using Contracts;
+using Mapster;
+using Meilisearch;
 
 namespace Carsties.Search.Data;
 
@@ -23,25 +23,39 @@ public class DbInitializer
         await client.WaitForTaskAsync(settingsTask.TaskUid);
     }
 
+    /// <summary>
+    /// Indeks backfill'i. C2: AuctionSvcUrl'e HTTP yerine surec ici IAuctionLookup
+    /// (eski AuctionSvcHttpClient kaldirildi); son guncellenen kayittan sonrasini alir.
+    /// </summary>
     public static async Task FetchMissingAuctions(WebApplication app)
     {
         var client = app.Services.GetRequiredService<MeilisearchClient>();
         var index = client.Index(IndexUid);
-        
-        using var scope = app.Services.CreateScope();
-        var auctionSvc = scope.ServiceProvider.GetRequiredService<AuctionSvcHttpClient>();
 
-        var items = await auctionSvc.GetItemsForSearch();
-        
+        var search = await index.SearchAsync<Item>(string.Empty, new SearchQuery
+        {
+            Sort = ["updatedAt:desc"],
+            Limit = 1,
+        });
+
+        DateTimeOffset? lastUpdated = search.Hits.FirstOrDefault() is { } newest
+            ? new DateTimeOffset(DateTime.SpecifyKind(newest.UpdatedAt, DateTimeKind.Utc))
+            : null;
+
+        using var scope = app.Services.CreateScope();
+        var lookup = scope.ServiceProvider.GetRequiredService<IAuctionLookup>();
+
+        var items = (await lookup.GetUpdatedSinceAsync(lastUpdated)).Adapt<List<Item>>();
+
         if (items.Count == 0)
         {
-            Console.WriteLine("Search index is up to date with the AuctionService");
+            app.Logger.LogInformation("Search index AuctionService ile guncel");
             return;
         }
-        
+
         var addTask = await index.AddDocumentsAsync(items, primaryKey: "id");
         await client.WaitForTaskAsync(addTask.TaskUid);
-        
-        Console.WriteLine($"Search index populated with {items.Count} items");
+
+        app.Logger.LogInformation("Search index {Count} auction ile dolduruldu", items.Count);
     }
 }

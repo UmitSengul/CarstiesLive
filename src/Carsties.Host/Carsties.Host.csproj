@@ -22,6 +22,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Auction.Module\Auction.Module.csproj" />
     <ProjectReference Include="..\Bid.Module\Bid.Module.csproj" />
+    <ProjectReference Include="..\Search.Module\Search.Module.csproj" />
+    <ProjectReference Include="..\Notification.Module\Notification.Module.csproj" />
   </ItemGroup>
 
 </Project>

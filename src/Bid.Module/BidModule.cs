@@ -1,7 +1,6 @@
 using Carsties.Bids.Backfill;
 using Carsties.Bids.Data;
 using Carsties.Bids.Endpoints;
-using Carsties.Bids.Services;
 using Mapster;
 
 namespace Carsties.Bids;
@@ -23,7 +22,6 @@ public static class BidModule
         // NpgsqlOperationInProgressException ('A command is already in progress') aliyordu.
         services.AddScoped<BidDbContext>();
         services.AddScoped<IBidRepository, BidRepository>();
-        services.AddScoped<GrpcAuctionClient>();
 
         // Cutover backfill'i: bids DB'sindeki eski zamanlanmis CheckAuctionEnded kayitlari
         // yeni store'da yok -> acilista yeniden planlanir (idempotent).

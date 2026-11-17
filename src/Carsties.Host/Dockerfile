@@ -2,8 +2,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
-# C2: 8081 kaldirilacak (gRPC yerine surec ici IAuctionLookup, tek port).
-EXPOSE 8081
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
@@ -11,6 +9,8 @@ WORKDIR /src
 COPY ["src/Carsties.Host/Carsties.Host.csproj", "src/Carsties.Host/"]
 COPY ["src/Auction.Module/Auction.Module.csproj", "src/Auction.Module/"]
 COPY ["src/Bid.Module/Bid.Module.csproj", "src/Bid.Module/"]
+COPY ["src/Search.Module/Search.Module.csproj", "src/Search.Module/"]
+COPY ["src/Notification.Module/Notification.Module.csproj", "src/Notification.Module/"]
 COPY ["src/Contracts/Contracts.csproj", "src/Contracts/"]
 RUN dotnet restore "src/Carsties.Host/Carsties.Host.csproj"
 COPY . .

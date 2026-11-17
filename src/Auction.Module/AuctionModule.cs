@@ -1,6 +1,7 @@
 using Carsties.Auctions.Data;
 using Carsties.Auctions.Errors;
 using Carsties.Auctions.Services;
+using Contracts;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
 using Wolverine.EntityFrameworkCore;
@@ -21,7 +22,6 @@ public static class AuctionModule
             throw new InvalidOperationException("ConnectionStrings:DefaultConnection bos (auctions)");
 
         services.AddControllers().AddApplicationPart(typeof(AuctionModule).Assembly);
-        services.AddGrpc();
 
         // Atomik outbox: store (host'ta kurulur) ile is verisi ayni DbContext uzerinden.
         services.AddDbContextWithWolverineIntegration<AuctionDbContext>(options =>
@@ -32,6 +32,9 @@ public static class AuctionModule
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
 
+        // Surec ici sorgu sozlesmesi (Bid + Search kullanir; gRPC/HTTP yerine).
+        services.AddScoped<IAuctionLookup, AuctionLookup>();
+
         // MappingConfig : IRegister bu assembly'de -> taranmazsa AuctionDto projeksiyonu bozulur.
         TypeAdapterConfig.GlobalSettings.Scan(typeof(AuctionModule).Assembly);
 
@@ -41,7 +44,6 @@ public static class AuctionModule
     public static WebApplication MapAuctionModule(this WebApplication app)
     {
         app.MapControllers();
-        app.MapGrpcService<AuctionGrpcServer>();   // C2: 8081 kaldirilacak (surec ici IAuctionLookup)
 
         try
         {

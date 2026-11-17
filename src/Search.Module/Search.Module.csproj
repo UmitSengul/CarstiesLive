@@ -1,28 +1,37 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk">
 
+    <!--
+      C2: Search modulu sinif kutuphanesi. HTTP (AuctionSvcUrl) bagimliligi kalkti:
+      auction verisi surec ici Contracts.IAuctionLookup ile okunur.
+    -->
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Mapster" Version="10.0.11" />
-      <PackageReference Include="MeiliSearch" Version="0.20.0" />
-      <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.8.0" />
-      <PackageReference Include="WolverineFx.RabbitMQ" Version="6.24.5" />
-      <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.24.5" />
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Contracts\Contracts.csproj" />
+        <Using Include="Microsoft.AspNetCore.Builder" />
+        <Using Include="Microsoft.AspNetCore.Hosting" />
+        <Using Include="Microsoft.AspNetCore.Http" />
+        <Using Include="Microsoft.AspNetCore.Routing" />
+        <Using Include="Microsoft.Extensions.Configuration" />
+        <Using Include="Microsoft.Extensions.DependencyInjection" />
+        <Using Include="Microsoft.Extensions.Hosting" />
+        <Using Include="Microsoft.Extensions.Logging" />
     </ItemGroup>
 
     <ItemGroup>
-      <Content Include="..\..\.dockerignore">
-        <Link>.dockerignore</Link>
-      </Content>
+        <PackageReference Include="Mapster" Version="10.0.11" />
+        <PackageReference Include="MeiliSearch" Version="0.20.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Contracts\Contracts.csproj" />
     </ItemGroup>
 
 </Project>

@@ -8,7 +8,7 @@ namespace AuctionService.Tests;
 
 public class AppFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgreSqlContainer = 
+    private readonly PostgreSqlContainer _postgreSqlContainer =
         new PostgreSqlBuilder("postgres:18")
             .WithDatabase("auctions")
             .WithUsername("postgres")
@@ -16,7 +16,7 @@ public class AppFixture : IAsyncLifetime
             .Build();
 
     public IAlbaHost Host { get; set; } = null!;
-    
+
     public async Task InitializeAsync()
     {
         await _postgreSqlContainer.StartAsync();
@@ -36,12 +36,42 @@ public class AppFixture : IAsyncLifetime
             builder.UseSetting("ConnectionStrings:DefaultConnection", auctionsDb);
             builder.UseSetting("ConnectionStrings:BidDbConnection", bidsDb);
 
+            // C2: CORS/SignalR origin'i (Program fail-fast eder).
+            builder.UseSetting("ClientApp", "http://localhost:3000");
+
             builder.ConfigureServices(services =>
             {
                 services.RunWolverineInSoloMode();
                 services.DisableAllExternalWolverineTransports();
             });
         }, new JwtSecurityStub());
+
+        // C2: Meilisearch:Url bu fixture'da yok -> Search modulu kaydedilmez.
+        await AssertModulesAsync(Host, "auction", "bid", "notification");
+    }
+
+    public async Task DisposeAsync()
+    {
+        await Host.StopAsync();
+        await Host.DisposeAsync();
+        await _postgreSqlContainer.DisposeAsync();
+    }
+
+    /// <summary>/health/ready modul kumesini tam dogrular (sessizce eksik modul kalmasin).</summary>
+    internal static async Task AssertModulesAsync(IAlbaHost host, params string[] expected)
+    {
+        var result = await host.Scenario(s =>
+        {
+            s.Get.Url("/health/ready");
+            s.StatusCodeShouldBe(200);
+        });
+
+        var payload = await result.ReadAsJsonAsync<ReadyPayload>();
+        Assert.NotNull(payload);
+
+        Assert.Equal(
+            expected.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+            payload!.Modules.OrderBy(x => x, StringComparer.Ordinal).ToArray());
     }
 
     private static string WithDatabase(string connectionString, string database)
@@ -53,12 +83,7 @@ public class AppFixture : IAsyncLifetime
         return string.Join(';', parts.Append($"Database={database}"));
     }
 
-    public async Task DisposeAsync()
-    {
-        await Host.StopAsync();
-        await Host.DisposeAsync();
-        await _postgreSqlContainer.DisposeAsync();
-    }
+    public sealed record ReadyPayload(string Status, string[] Modules);
 }
 
 [CollectionDefinition("auction-service")]

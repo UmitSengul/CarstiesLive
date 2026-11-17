@@ -27,7 +27,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Grpc.AspNetCore" Version="2.83.0" />
       <PackageReference Include="Mapster" Version="10.0.11" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
         <PrivateAssets>all</PrivateAssets>
@@ -39,10 +38,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Contracts\Contracts.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <ProtoBuf Include="Protos\auction.proto" GrpcServices="Server" />
     </ItemGroup>
 
 </Project>

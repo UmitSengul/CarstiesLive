@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Carsties.Bids.Data;
 using Carsties.Bids.Models;
-using Carsties.Bids.Services;
 using Contracts;
 using Mapster;
 using Wolverine;
@@ -18,19 +17,30 @@ public static class BidEndpoints
         group.MapGet("/{auctionId}", GetBidsForAuction);
     }
 
-    private static async Task<IResult> PlaceBid(string auctionId, int amount, ClaimsPrincipal user, 
-        IBidRepository repository, IMessageBus bus, GrpcAuctionClient grpcClient)
+    private static async Task<IResult> PlaceBid(string auctionId, int amount, ClaimsPrincipal user,
+        IBidRepository repository, IMessageBus bus, IAuctionLookup auctionLookup)
     {
         var auction = await repository.GetAuctionAsync(auctionId);
 
         if (auction == null)
         {
-            auction = grpcClient.GetAuction(auctionId);
+            // C2: eski gRPC cagrisi (AuctionService :81) yerine surec ici lookup.
+            var snapshot = await auctionLookup.FindAsync(auctionId);
 
-            if (auction == null)
+            if (snapshot == null)
             {
                 return Results.NotFound();
             }
+
+            auction = new Auction
+            {
+                Id = snapshot.Id,
+                AuctionEnd = snapshot.AuctionEnd,
+                Seller = snapshot.Seller,
+                ReservePrice = snapshot.ReservePrice,
+                // gRPC server'in eski semantigi: Finished = Status != Live
+                Finished = snapshot.Status != "Live",
+            };
         }
 
         if (auction.Seller == user.Identity?.Name)
