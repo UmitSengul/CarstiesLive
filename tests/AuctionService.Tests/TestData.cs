@@ -1,5 +1,5 @@
-using AuctionService.DTOs;
-using AuctionService.Entities;
+using Carsties.Auctions.DTOs;
+using Carsties.Auctions.Entities;
 
 namespace AuctionService.Tests;
 

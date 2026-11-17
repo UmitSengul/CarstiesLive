@@ -1,8 +1,8 @@
 using System.Net;
 using System.Security.Claims;
-using AuctionService.Data;
-using AuctionService.DTOs;
-using AuctionService.Entities;
+using Carsties.Auctions.Data;
+using Carsties.Auctions.DTOs;
+using Carsties.Auctions.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

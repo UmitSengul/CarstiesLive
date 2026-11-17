@@ -1,5 +1,5 @@
-using AuctionService.Data;
-using AuctionService.Entities;
+using Carsties.Auctions.Data;
+using Carsties.Auctions.Entities;
 using Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Wolverine.Tracking;

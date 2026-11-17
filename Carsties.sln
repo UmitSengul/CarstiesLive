@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{73DD4F46-D43B-4193-AF82-ADB7808D073C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuctionService", "src\AuctionService\AuctionService.csproj", "{28AE57AD-6D87-43B7-8070-3AAC352C8652}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Auction.Module", "src\Auction.Module\Auction.Module.csproj", "{28AE57AD-6D87-43B7-8070-3AAC352C8652}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution items", "Solution items", "{3AC1A6C7-98AD-490B-92F9-AF7EE51CED06}"
 	ProjectSection(SolutionItems) = preProject
@@ -17,7 +17,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityService", "src\Iden
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GatewayService", "src\GatewayService\GatewayService.csproj", "{DB7B9FD1-0EA3-4980-AB0F-9108E52DD30C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BidService", "src\BidService\BidService.csproj", "{A2558A20-F521-49E6-90D2-2ABD83157F7D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bid.Module", "src\Bid.Module\Bid.Module.csproj", "{A2558A20-F521-49E6-90D2-2ABD83157F7D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationService", "src\NotificationService\NotificationService.csproj", "{D0711653-C372-425F-9105-36ED2322CA93}"
 EndProject

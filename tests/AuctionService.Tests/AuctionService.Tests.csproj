@@ -21,7 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\AuctionService\AuctionService.csproj" />
+      <ProjectReference Include="..\..\src\Auction.Module\Auction.Module.csproj" />
     </ItemGroup>
 
 </Project>
