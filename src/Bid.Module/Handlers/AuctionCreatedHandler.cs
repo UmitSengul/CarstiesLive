@@ -6,7 +6,7 @@ using Wolverine;
 
 namespace Carsties.Bids.Handlers;
 
-public class AuctionCreatedHandler(IBidRepository repository)
+public class AuctionCreatedHandler(IBidRepository repository, ILogger<AuctionCreatedHandler> logger)
 {
     public async Task Handle(AuctionCreated message, IMessageBus bus)
     {
@@ -18,8 +18,15 @@ public class AuctionCreatedHandler(IBidRepository repository)
             ReservePrice = message.ReservePrice,
         };
         
-        await repository.CreateAuctionAsync(auction);
-        
+        // on conflict do nothing: ayni AuctionCreated tekrar teslim edilirse
+        // (retry/redelivery) schedule'i ikinci kez olusturmayiz.
+        var inserted = await repository.CreateAuctionAsync(auction);
+        if (!inserted)
+        {
+            logger.LogWarning("AuctionCreated tekrar teslim edildi, atlandi: {AuctionId}", auction.Id);
+            return;
+        }
+
         var auctionEndUtc = new DateTimeOffset(DateTime
             .SpecifyKind(auction.AuctionEnd, DateTimeKind.Utc));
 

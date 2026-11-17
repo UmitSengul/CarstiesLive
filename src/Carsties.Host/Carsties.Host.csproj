@@ -8,8 +8,20 @@
   </PropertyGroup>
 
   <!--
-    C0: bos iskelet. Modul projeleri C1'den itibaren buraya referans olarak eklenir.
-    Tek Kestrel, tek port (8080); MVC controller'lari C1'de korunarak tasinir.
+    C1: tek host, tek Wolverine runtime (ADR-0006: store auctions/auctions_rmq).
+    Surumler 6.25.3'te sabit: eski iki servis 6.24.5 / 6.25.2 karisimi kullaniyordu.
   -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
+    <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="6.25.3" />
+    <PackageReference Include="WolverineFx.Postgresql" Version="6.25.3" />
+    <PackageReference Include="WolverineFx.RabbitMQ" Version="6.25.3" />
+    <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.25.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Auction.Module\Auction.Module.csproj" />
+    <ProjectReference Include="..\Bid.Module\Bid.Module.csproj" />
+  </ItemGroup>
 
 </Project>

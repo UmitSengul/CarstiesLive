@@ -1,37 +1,46 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk">
 
+    <!--
+      C1: Auction modulu artik bir sinif kutuphanesi. Web host'u Carsties.Host'tur;
+      MVC controller'lari korunur (AddApplicationPart ile), Program.cs silindi.
+    -->
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <!-- Sinif kutuphanesinde Web SDK'nin implicit using'leri yok; ASP.NET Core seti acikca eklenir. -->
+    <ItemGroup>
+        <Using Include="Microsoft.AspNetCore.Builder" />
+        <Using Include="Microsoft.AspNetCore.Hosting" />
+        <Using Include="Microsoft.AspNetCore.Http" />
+        <Using Include="Microsoft.AspNetCore.Routing" />
+        <Using Include="Microsoft.Extensions.Configuration" />
+        <Using Include="Microsoft.Extensions.DependencyInjection" />
+        <Using Include="Microsoft.Extensions.Hosting" />
+        <Using Include="Microsoft.Extensions.Logging" />
+    </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="Grpc.AspNetCore" Version="2.83.0" />
       <PackageReference Include="Mapster" Version="10.0.11" />
-      <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
-      <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="6.24.5" />
-      <PackageReference Include="WolverineFx.Postgresql" Version="6.24.5" />
-      <PackageReference Include="WolverineFx.RabbitMQ" Version="6.24.5" />
-      <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.24.5" />
+      <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="6.25.3" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Contracts\Contracts.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Content Include="..\..\.dockerignore">
-        <Link>.dockerignore</Link>
-      </Content>
-    </ItemGroup>
-    
     <ItemGroup>
         <ProtoBuf Include="Protos\auction.proto" GrpcServices="Server" />
     </ItemGroup>

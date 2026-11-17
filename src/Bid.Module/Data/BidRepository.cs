@@ -55,24 +55,43 @@ public class BidRepository(BidDbContext dbContext) : IBidRepository
         return bids.Adapt<IEnumerable<BidDto>>();
     }
 
-    public async Task<Auction> CreateAuctionAsync(Auction auction)
+    /// <summary>
+    /// Idempotent insert: Wolverine at-least-once teslim eder; ayni AuctionCreated
+    /// tekrar gelirse PK ihlali yerine 0 doner (retry -> DLQ onlenir).
+    /// </summary>
+    public async Task<bool> CreateAuctionAsync(Auction auction)
     {
-        await dbContext.DbConnection.ExecuteAsync(
+        var rows = await dbContext.DbConnection.ExecuteAsync(
             """
             insert into auctions (id, auctionend, seller, reserveprice)
             values (@Id, @AuctionEnd, @Seller, @ReservePrice)
+            on conflict (id) do nothing
             """, auction
         );
-        
-        return auction;
+
+        return rows > 0;
     }
 
-    public async Task MarkAuctionFinishedAsync(string auctionId)
+    /// <summary>
+    /// Kosullu update: yalniz finished=false -> true gecisinde 1 doner. Ayni auction
+    /// icin duplike CheckAuctionEnded (backfill + eski schedule) tek kez publish eder.
+    /// </summary>
+    public async Task<bool> MarkAuctionFinishedAsync(string auctionId)
     {
-        await dbContext.DbConnection.ExecuteAsync(
+        var rows = await dbContext.DbConnection.ExecuteAsync(
             """
-            update auctions set finished = true where id = @auctionId
+            update auctions set finished = true where id = @auctionId and finished = false
             """, new { auctionId }
+        );
+
+        return rows > 0;
+    }
+
+    /// <summary>Acilis backfill'i icin: bitmemis auction'lar.</summary>
+    public async Task<IEnumerable<Auction>> GetUnfinishedAuctionsAsync()
+    {
+        return await dbContext.DbConnection.QueryAsync<Auction>(
+            "select id, auctionend, seller, reserveprice, finished from auctions where finished = false"
         );
     }
 

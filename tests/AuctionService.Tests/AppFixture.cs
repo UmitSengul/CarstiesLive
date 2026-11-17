@@ -24,14 +24,33 @@ public class AppFixture : IAsyncLifetime
         Host = await AlbaHost.For<Program>(builder =>
         {
             builder.UseEnvironment("Test");
-            builder.UseSetting("ConnectionStrings:DefaultConnection",
-                _postgreSqlContainer.GetConnectionString());
+
+            var auctionsDb = _postgreSqlContainer.GetConnectionString();
+
+            // C1: ayni host'ta Bid.Module de var; Bid DbInitializer (DbUp) startup'ta
+            // calisir ve ConnectionStrings:BidDbConnection yoksa firlatir. Ayni container,
+            // ayri veritabani ("bids") — ayni DB olsaydi EF "Auctions" ile Dapper
+            // "auctions" tablolari karisirdi.
+            var bidsDb = WithDatabase(auctionsDb, "bids");
+
+            builder.UseSetting("ConnectionStrings:DefaultConnection", auctionsDb);
+            builder.UseSetting("ConnectionStrings:BidDbConnection", bidsDb);
+
             builder.ConfigureServices(services =>
             {
                 services.RunWolverineInSoloMode();
                 services.DisableAllExternalWolverineTransports();
             });
         }, new JwtSecurityStub());
+    }
+
+    private static string WithDatabase(string connectionString, string database)
+    {
+        var parts = connectionString
+            .Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Where(p => !p.StartsWith("Database=", StringComparison.OrdinalIgnoreCase));
+
+        return string.Join(';', parts.Append($"Database={database}"));
     }
 
     public async Task DisposeAsync()

@@ -21,7 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\Auction.Module\Auction.Module.csproj" />
+      <ProjectReference Include="..\..\src\Carsties.Host\Carsties.Host.csproj" />
     </ItemGroup>
 
 </Project>

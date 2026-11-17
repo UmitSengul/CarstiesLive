@@ -13,7 +13,8 @@ public class CheckAuctionEndedHandler(IBidRepository repository, IMessageBus bus
 
         if (auction == null || auction.Finished) return;
 
-        await repository.MarkAuctionFinishedAsync(auction.Id);
+        // Kosullu update: duplike schedule/teslimat tek kez publish eder (idempotent).
+        if (!await repository.MarkAuctionFinishedAsync(auction.Id)) return;
 
         var winningBid = await repository.GetWinningBidAsync(auction.Id);
 
