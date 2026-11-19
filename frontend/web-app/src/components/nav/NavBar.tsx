@@ -12,10 +12,20 @@ export default async function NavBar() {
 
     return (
         <header className='sticky top-0 z-50 p-3 bg-background items-center shadow-lg flex justify-between'>
-            <Link href='/' className='flex items-center gap-2 text-3xl font-semibold text-red-500'>
-                <CarFront size={50}/>
-                <div>Carsties Auctions</div>
-            </Link>
+            <div className='flex items-center gap-4'>
+                <Link href='/' className='flex items-center gap-2 text-3xl font-semibold text-red-500'>
+                    <CarFront size={50}/>
+                    <div>Carsties Auctions</div>
+                </Link>
+                {/* Platform ana sayfasina donus */}
+                <a
+                    href={process.env.NEXT_PUBLIC_PORTAL_URL ?? 'https://umitsengul.online'}
+                    className='hidden text-xs text-muted-foreground hover:text-foreground md:inline'
+                    title='umitsengul.online'
+                >
+                    &larr; umitsengul.online
+                </a>
+            </div>
             <Suspense>
                 <SearchInput/>
             </Suspense>
