@@ -1,4 +1,4 @@
-﻿# ============================================
+# ============================================
 # Stage 1: Dependencies Installation Stage
 # ============================================
 
@@ -43,6 +43,14 @@ COPY --from=dependencies /app/node_modules ./node_modules
 
 # Copy application source code
 COPY . .
+
+# NEXT_PUBLIC_* degerleri ISTEMCI paketine GOMULUR: calisma anindaki env degil,
+# derleme anindaki deger gecerlidir. Bu yuzden build arg olarak verilir
+# (2026-11-19: .env.production test adresleri yuzunden CORS/SignalR kiriliyordu).
+ARG NEXT_PUBLIC_BASE_API=https://api.umitsengul.online
+ARG NEXT_PUBLIC_ID_URL=https://id.umitsengul.online
+ENV NEXT_PUBLIC_BASE_API=$NEXT_PUBLIC_BASE_API
+ENV NEXT_PUBLIC_ID_URL=$NEXT_PUBLIC_ID_URL
 
 ENV NODE_ENV=production
 
